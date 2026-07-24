@@ -1,0 +1,26 @@
+# CMake build directories
+cmake-build-debug/
+cmake-build-release/
+build/
+
+# deps that have their own git
+deps/sdsl-lite
+
+# IDE files
+.idea/
+.vscode/
+*.swp
+*.swo
+
+# Binaries / Executables
+cdx_builder
+*.o
+*.a
+*.so
+
+# gbz test file
+*.gbz
+
+# Other
+token.txt
+
