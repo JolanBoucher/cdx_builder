@@ -24,3 +24,5 @@ cdx_builder
 # Other
 token.txt
 
+.DS_Store
+**/ .DS_Store
