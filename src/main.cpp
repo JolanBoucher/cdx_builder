@@ -1,0 +1,142 @@
+#include <iostream>
+#include <fstream>
+#include <sstream>
+#include <vector>
+#include <string>
+#include <boost/xpressive/regex_primitives.hpp>
+#include <gbwtgraph/gbz.h>
+#include "constant.h"
+#include "gbz_IO.h"
+#include <chrono>
+
+
+int main()
+{
+    auto total_start = std::chrono::high_resolution_clock::now();
+
+    auto start = std::chrono::high_resolution_clock::now();
+
+    std::string gbz_path = "yeast.gbz";
+    std::ifstream in(gbz_path, std::ios::binary);
+    if (!in) {
+        std::cerr << "Erreur : Impossible d'ouvrir " << gbz_path << std::endl;
+        return 1;
+    }
+
+    gbwtgraph::GBZ gbz;
+    gbz.simple_sds_load(in);
+
+    auto end = std::chrono::high_resolution_clock::now();
+    std::chrono::duration<double> elapsed = end - start;
+    std::cerr << "[INFO] Chargement du fichier GBZ termine en " << elapsed.count() << " s\n" << std::endl;
+
+//------------------------------------------------------------------------------------
+
+    start = std::chrono::high_resolution_clock::now();
+
+    cfg::NB_NODES = gbz.graph.get_node_count();
+    if (cfg::NB_NODES > cfg::NODE_UNSEEN_32) {
+        throw std::overflow_error(
+            "The number of nodes in this graph exceeds the size allowed of " +
+            std::to_string(cfg::NODE_UNSEEN_32)
+        );
+    }
+    const handlegraph::nid_t min_nid = gbz.graph.min_node_id();
+    const handlegraph::nid_t max_nid = gbz.graph.max_node_id();
+
+    // calcul de la taille nécessaire des arrays
+    cfg::ARRAY_SIZE = static_cast<size_t>(max_nid) + 1;
+    // calcul de la densité du graphe
+    const double span = static_cast<double>(max_nid - min_nid + 1);
+    const double density = static_cast<double>(cfg::NB_NODES) / span;
+
+    // 3. Affichage formaté à 3 décimales
+    std::cout << std::fixed << std::setprecision(3);
+    std::cout << "Found " << cfg::NB_NODES << " nodes (index density: " << density << ") in the graph\n";
+
+    // On peut toujours lire le nombre de noeuds et chemins via gbz.graph
+    std::cout << "Paths: " << gbz.graph.get_path_count() << "\n\n";
+
+    end = std::chrono::high_resolution_clock::now();
+    elapsed = end - start;
+    std::cerr << "[INFO] Analyse des dimensions terminee en " << elapsed.count() << " s\n" << std::endl;
+
+//------------------------------------------------------------------------------------
+    start = std::chrono::high_resolution_clock::now();
+
+    // load the node length and nid of every node
+    // initialize the data_structure at the correct length
+    std::vector<uint32_t> n_len(cfg::ARRAY_SIZE, cfg::NODE_UNSEEN_32);
+    std::vector<uint32_t> parent(cfg::ARRAY_SIZE, cfg::NODE_UNSEEN_32);
+    std::vector<uint16_t> children(cfg::ARRAY_SIZE, cfg::NODE_UNSEEN_16);
+
+    // retrieve length and nid of every node in the graphe via gbz handle
+    gbz.graph.for_each_handle([&](const handlegraph::handle_t& handle) -> bool {
+        const handlegraph::nid_t nid = gbz.graph.get_id(handle);
+        const size_t node_lenght = gbz.graph.get_length(handle);
+
+        n_len[nid] = static_cast<uint32_t>(node_lenght);    // valid node get their length
+        parent[nid] = static_cast<uint32_t>(nid);           // valid node start each in their own component
+        children[nid] = 0;                                  // valid node start with no child
+
+        return true;
+    });
+
+    end = std::chrono::high_resolution_clock::now();
+    elapsed = end - start;
+    std::cerr << "[INFO] Initialisation terminee en " << elapsed.count() << " s\n" << std::endl;
+
+    start = std::chrono::high_resolution_clock::now();
+
+    // attribute each node to it's graph's connected component
+    std::vector<uint16_t> nid2compo = get_graph_components(gbz.graph, parent, children);
+
+    end = std::chrono::high_resolution_clock::now();
+    elapsed = end - start;
+    std::cerr << "[INFO] Calcul des composantes connexes termine en " << elapsed.count() << " s\n" << std::endl;
+
+    start = std::chrono::high_resolution_clock::now();
+
+    // Associate each component id with it's contig/path name
+    size_t max_step_to_check = 0; // 0 for full path validation, or e.g. 100 for partial validation
+    std::vector<std::string> component_names = bind_component_names(gbz, nid2compo, max_step_to_check);
+
+    end = std::chrono::high_resolution_clock::now();
+    elapsed = end - start;
+    std::cerr << "[INFO] Association des noms de composants terminee en " << elapsed.count() << " s\n" << std::endl;
+
+    start = std::chrono::high_resolution_clock::now();
+
+    // evaluate the number of haplotype in this graph
+    cfg::N_HAPLO = count_haplotypes(gbz.graph);
+
+    end = std::chrono::high_resolution_clock::now();
+    elapsed = end - start;
+    std::cerr << "[INFO] Comptage des haplotypes termine en " << elapsed.count() << " s\n" << std::endl;
+
+    start = std::chrono::high_resolution_clock::now();
+
+    // calculate median offset of each node in the graph
+    std::vector<uint32_t> offsets_median = compute_nodes_median_offset(gbz.graph);
+
+    end = std::chrono::high_resolution_clock::now();
+    elapsed = end - start;
+    std::cerr << "[INFO] Calcul des offsets medians termine en " << elapsed.count() << " s\n" << std::endl;
+
+    start = std::chrono::high_resolution_clock::now();
+
+    // calculate weight for each edge in the graph
+    std::unordered_map<uint64_t, uint32_t> edges_weight = compute_edge_weights(gbz.graph);
+
+    end = std::chrono::high_resolution_clock::now();
+    elapsed = end - start;
+    std::cerr << "[INFO] Calcul des poids des aretes termine en " << elapsed.count() << " s\n" << std::endl;
+
+    // return each component name ordered
+
+    auto total_end = std::chrono::high_resolution_clock::now();
+    std::chrono::duration<double> total_elapsed = total_end - total_start;
+    std::cerr << "[INFO] Execution totale terminee en " << total_elapsed.count() << " s" << std::endl;
+
+    return 0;
+}
