@@ -95,6 +95,9 @@ add_executable(cdx_builder
         src/gbz_IO.cpp
         src/gbz_IO.h
         src/constant.h
+        src/graph_linearization.cpp
+        src/graph_linearization.h
+        src/CSRMatrix.cpp
 )
 
 target_include_directories(cdx_builder PRIVATE

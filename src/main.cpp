@@ -7,6 +7,7 @@
 #include <gbwtgraph/gbz.h>
 #include "constant.h"
 #include "gbz_IO.h"
+#include "graph_linearization.h"
 #include <chrono>
 
 
@@ -16,7 +17,7 @@ int main()
 
     auto start = std::chrono::high_resolution_clock::now();
 
-    std::string gbz_path = "yeast.gbz";
+    std::string gbz_path = "messy.gbz";
     std::ifstream in(gbz_path, std::ios::binary);
     if (!in) {
         std::cerr << "Erreur : Impossible d'ouvrir " << gbz_path << std::endl;
@@ -47,8 +48,8 @@ int main()
     // calcul de la taille nécessaire des arrays
     cfg::ARRAY_SIZE = static_cast<size_t>(max_nid) + 1;
     // calcul de la densité du graphe
-    const double span = static_cast<double>(max_nid - min_nid + 1);
-    const double density = static_cast<double>(cfg::NB_NODES) / span;
+    const auto span = static_cast<double>(max_nid - min_nid + 1);
+    const auto density = static_cast<double>(cfg::NB_NODES) / span;
 
     // 3. Affichage formaté à 3 décimales
     std::cout << std::fixed << std::setprecision(3);
@@ -133,6 +134,45 @@ int main()
     std::cerr << "[INFO] Calcul des poids des aretes termine en " << elapsed.count() << " s\n" << std::endl;
 
     // return each component name ordered
+
+    //  build CSR table for relaxation
+    start = std::chrono::high_resolution_clock::now();
+    CSRMatrix matrix = build_csr_matrix(edges_weight);
+    end = std::chrono::high_resolution_clock::now();
+
+    elapsed = end - start;
+    std::cerr << "[INFO] Construction de la matrice CSR termine en " << elapsed.count() << " s\n" << std::endl;
+
+
+    //  topology relaxation
+    // Paramètres de la relaxation
+    const float convergence_threshold = 0.01f;
+    const int max_iterations = 1000;
+    const float lambda_anchor = 0.5f;
+
+    auto start_relax = std::chrono::high_resolution_clock::now();
+    auto [relaxed_positions, executed_iterations] = relax_topology(
+        matrix,
+        n_len,
+        offsets_median,
+        convergence_threshold,
+        max_iterations,
+        lambda_anchor
+    );
+    auto end_relax = std::chrono::high_resolution_clock::now();
+    std::chrono::duration<double> elapsed_relax = end_relax - start_relax;
+
+    std::cerr << "[INFO] Relaxation topologique terminee en "
+              << executed_iterations << " iterations ("
+              << elapsed_relax.count() << " s)\n" << std::endl;
+
+    //  midpoint calculation
+
+    //  local building the local index for each component
+
+    // TSV debug output
+
+    // CDX output and compress output
 
     auto total_end = std::chrono::high_resolution_clock::now();
     std::chrono::duration<double> total_elapsed = total_end - total_start;

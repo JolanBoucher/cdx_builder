@@ -559,42 +559,25 @@ std::vector<uint32_t> compute_nodes_median_offset(const gbwtgraph::GBWTGraph& gr
     // A nonexistent node or a node without any path occurrence keeps the value NODE_UNSEEN_32.
     std::vector<uint32_t> medians(cfg::ARRAY_SIZE,cfg::NODE_UNSEEN_32);
 
-    for (size_t nid = 0; nid < cfg::ARRAY_SIZE; ++nid) {
+    for (size_t nid = 1; nid < cfg::ARRAY_SIZE; ++nid) {
         const auto start = static_cast<size_t>(offsets_key[nid]);
         const auto end = static_cast<size_t>(offsets_key[nid + 1]);
         const size_t slice_size = end - start;
 
-        // The node does not exist or does not occur in any path.
-        // Its median remains NODE_UNSEEN_32.
-        if (slice_size == 0) {continue;}
+        // An absent node or a node without a path occurrence
+        // keeps NODE_UNSEEN_32.
+        if (slice_size == 0) continue;
 
-        auto it_begin = offsets_table.begin() + start;
+        auto slice_begin =offsets_table.begin() + start;
+        const auto slice_end = offsets_table.begin() + end;
+        auto right_median = slice_begin + (slice_size / 2);
 
-        if (slice_size == 1) {medians[nid] = *it_begin;
-            continue;
-        }
-
-        if (slice_size == 2) {
-            medians[nid] = std::max(*it_begin,*(it_begin + 1));
-            continue;
-        }
-
-        auto it_end = offsets_table.begin() + end;
-        auto it_middle = it_begin + (slice_size / 2);
-
-        // Partially reorder the interval so the median is at it_middle.
-        std::nth_element(it_begin, it_middle,it_end);
-
-        if (slice_size % 2 != 0) {
-            medians[nid] = *it_middle;
-        }
-        else {
-            const uint32_t lower_median = *std::max_element(it_begin, it_middle);
-            const uint32_t upper_median = *it_middle;
-
-            medians[nid] = static_cast<uint32_t>(
-                (static_cast<uint64_t>(lower_median) + static_cast<uint64_t>(upper_median)) / 2);
-        }
+        /*
+         * Select the same value as:  sorted_offsets[slice_size / 2]
+         * This is the right median for an even number of observations.
+         */
+        std::nth_element(slice_begin, right_median,slice_end);
+        medians[nid] = *right_median;
     }
 
     return medians;
