@@ -1,14 +1,15 @@
-#include <iostream>
+#include <chrono>
 #include <fstream>
+#include <iostream>
 #include <sstream>
-#include <vector>
 #include <string>
+#include <vector>
 #include <boost/xpressive/regex_primitives.hpp>
 #include <gbwtgraph/gbz.h>
 #include "constant.h"
 #include "gbz_IO.h"
+#include "graph_indexing.h"
 #include "graph_linearization.h"
-#include <chrono>
 
 
 int main()
@@ -146,9 +147,9 @@ int main()
 
     //  topology relaxation
     // Paramètres de la relaxation
-    const float convergence_threshold = 0.01f;
-    const int max_iterations = 1000;
-    const float lambda_anchor = 0.5f;
+    constexpr float convergence_threshold = 0.01f;
+    constexpr int max_iterations = 1000;
+    constexpr float lambda_anchor = 0.5f;
 
     auto start_relax = std::chrono::high_resolution_clock::now();
     auto [relaxed_positions, executed_iterations] = relax_topology(
@@ -167,8 +168,23 @@ int main()
               << elapsed_relax.count() << " s)\n" << std::endl;
 
     //  midpoint calculation
+    auto start_midpoint = std::chrono::high_resolution_clock::now();
+    std::vector<uint32_t> nodes_midpoint = calculate_midpoint(relaxed_positions, n_len);
+    auto end_midpoint = std::chrono::high_resolution_clock::now();
+
+    std::chrono::duration<double> elapsed_midpoint = end_midpoint - start_midpoint;
+    std::cerr << "[INFO] Midpoint calculé en " << elapsed_midpoint.count() << " s\n" << std::endl;
 
     //  local building the local index for each component
+    auto start_sort = std::chrono::high_resolution_clock::now();
+    std::vector<uint32_t> idx_table = assign_local_idx(
+        nid2compo,
+        relaxed_positions,
+        nodes_midpoint);
+    auto end_sort = std::chrono::high_resolution_clock::now();
+
+    std::chrono::duration<double> elapsed_sort = end_sort - start_sort;
+    std::cerr << "[INFO] Attribution des idx local termine en " << elapsed_sort.count() << " s\n" << std::endl;
 
     // TSV debug output
 

@@ -98,6 +98,8 @@ add_executable(cdx_builder
         src/graph_linearization.cpp
         src/graph_linearization.h
         src/CSRMatrix.cpp
+        src/graph_indexing.cpp
+        src/graph_indexing.h
 )
 
 target_include_directories(cdx_builder PRIVATE

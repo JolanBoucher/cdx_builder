@@ -423,7 +423,7 @@ std::vector<uint32_t> double2uint32(
             executed_iteration = iter;
             std::cout << "Convergence reached at iteration " << iter
                       << ": RMS displacement " << std::fixed << std::setprecision(8) << rms_displacement
-                      << " bp < threshold "<< convergence_threshold << " bp." << '\n';
+                      << " bp < threshold "<< std::setprecision(2)<< convergence_threshold << " bp." << '\n';
             break;
         }
     }
