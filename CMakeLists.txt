@@ -100,6 +100,8 @@ add_executable(cdx_builder
         src/CSRMatrix.cpp
         src/graph_indexing.cpp
         src/graph_indexing.h
+        src/cdx_format.cpp
+        src/cdx_format.h
 )
 
 target_include_directories(cdx_builder PRIVATE
