@@ -102,6 +102,8 @@ add_executable(cdx_builder
         src/graph_indexing.h
         src/cdx_format.cpp
         src/cdx_format.h
+        src/cdx_writer.cpp
+        src/cdx_writer.h
 )
 
 target_include_directories(cdx_builder PRIVATE
