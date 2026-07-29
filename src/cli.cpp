@@ -75,7 +75,9 @@ CliArgs parse_args(int argc, char** argv)
         "Compression reduces storage requirements but is intended primarily "
         "for archival and file transfer rather than direct querying. "
         "Default 3."
-    )->check(CLI::Range(1, 22));
+    )->check(CLI::Range(1, 22))
+     ->type_size(0, 1)    // Accepts 0 or 1 arguments
+     ->default_str("3");
 
     auto* opt_debug = group_output->add_flag(
         "-d,--debug",

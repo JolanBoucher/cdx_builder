@@ -274,7 +274,7 @@ std::vector<std::string> bind_component_names(
 #ifndef NDEBUG
     // Optional debug printing to stdout/stderr to verify mapping in dev builds
     for (size_t cid = 0; cid < sorted_component_names.size(); ++cid) {
-        std::cerr << "[bind_component_names] CID " << cid << " -> " << sorted_component_names[cid] << '\n';
+        std::cerr << "[DEBUG] CID " << cid << " -> " << sorted_component_names[cid] << '\n';
     }
 #endif
 
