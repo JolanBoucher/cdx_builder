@@ -7,8 +7,15 @@
 
 #include <string>
 #include <vector>
+#include <filesystem>
 
 namespace  cdx {
+    struct CdxWriteStats
+    {
+        std::vector<std::uint64_t> component_counts;
+        std::uint64_t total_records = 0;
+    };
+
     class CdxWriter  final
     {
     public:
@@ -16,7 +23,7 @@ namespace  cdx {
         static constexpr std::size_t DEFAULT_BUFFER_SIZE = 8 * 1024 * 1024; // 8 MB
 
         /**
-         * @brief Writes a CDX v1 file from array representations of graph nodes.
+         * @brief Writes a CDX file from array representations of graph nodes.
          *
          * @param output_path Path to the output .cdx file.
          * @param compo_names Vector of UTF-8 component names.
@@ -27,31 +34,46 @@ namespace  cdx {
          * @param buffer_size Output write buffer capacity in bytes (default: 8 MB).
          */
         static void write_cdx_file(
-            const std::string& output_path,
+            const std::filesystem::path& filepath,
             const std::vector<std::string>& compo_names,
             const std::vector<std::uint16_t>& nid2compo,
             const std::vector<std::uint32_t>& local_idx,
             const std::vector<std::uint32_t>& seq_len,
-            std::uint64_t nid_offset = 1ULL,
-            std::size_t buffer_size = DEFAULT_BUFFER_SIZE
-            );
+            std::uint64_t nid_offset = 0,
+            std::size_t buffer_size = 8 * 1024 * 1024
+        );
 
         /**
          * @brief Writing CDX compressed with Zstandard (.cdx.zst).
          */
         static void write_cdx_zstd_file(
-            const std::string& output_path,
+            const std::filesystem::path& filepath,
             const std::vector<std::string>& compo_names,
             const std::vector<std::uint16_t>& nid2compo,
             const std::vector<std::uint32_t>& local_idx,
             const std::vector<std::uint32_t>& seq_len,
-            int compression_level = 3,
-            std::uint64_t node_id_offset = 1ULL,
-            std::size_t buffer_size = DEFAULT_BUFFER_SIZE
+            std::uint64_t nid_offset = 0,
+            std::size_t buffer_size = DEFAULT_BUFFER_SIZE,
+            int compression_level = 3
         );
 
 
     private:
+
+        static CdxWriteStats validate_and_count_records(
+            const std::vector<std::string>& compo_names,
+            const std::vector<std::uint16_t>& nid2compo,
+            const std::vector<std::uint32_t>& local_idx,
+            const std::vector<std::uint32_t>& seq_len
+        );
+
+#ifndef NDEBUG
+        static void debug_validate_local_idx_density(
+            const std::vector<std::uint16_t>& nid2compo,
+            const std::vector<std::uint32_t>& local_idx,
+            const std::vector<std::uint64_t>& component_counts
+        );
+#endif
 
         /*
          * A writing stream of CDX format v1 that can be passed to any writing format
