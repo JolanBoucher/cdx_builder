@@ -1,6 +1,22 @@
-//
-// Created by Jolan on 2026-07-26.
-//
+/**
+ * @file graph_linearization.h
+ * @brief Graph Linearization & Coordinate Relaxation Module.
+ *
+ * This module provides high-performance data structures and algorithm orchestrators
+ * to linearize graph nodes into continuous coordinate spaces. It features:
+ *
+ * 1. **Bidirectional Compressed Sparse Row (CSR) Representation (`CSRMatrix`)**:
+ *    - Memory-efficient separate forward/backward adjacency storage for rapid graph traversal.
+ *    - Node-level topological trust factors (alpha) and edge path weights.
+ *
+ * 2. **Cache-Aligned Active Node Layout (`ActiveNode`)**:
+ *    - Exactly 32-byte cache-friendly structures designed for dense multithreaded accesses
+ *      during relaxation passes.
+ *
+ * 3. **Parallel Topological Coordinate Relaxation (`relax_topology`)**:
+ *    - OpenMP-accelerated iterative solver balancing local neighbor connectivity
+ *      (via weighted barycenter) with fixed anchor positions (via regularization parameter lambda).
+ */
 #include <vector>
 #include "graph_indexing.h"
 
