@@ -18,8 +18,8 @@
 #include <filesystem>
 
 //TODO pass the error message from everywhere to the main and deal with it properly
-
-//TODO give proper commentary and docstring to each funciton
+//TODO give proper commentary and docstring to each function (almost finish)
+//TODO check the cMake for the weird warning
 
 
 // Helper to format timing outputs consistently
