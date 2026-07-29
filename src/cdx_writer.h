@@ -15,19 +15,6 @@ namespace  cdx {
         CdxWriter() = delete;
         static constexpr std::size_t DEFAULT_BUFFER_SIZE = 8 * 1024 * 1024; // 8 MB
 
-        /*
-         * A writing stream of CDX format v1 that can be passed to any writing format
-         */
-        static void write_cdx_stream(
-            std::ostream& out,
-            const std::vector<std::string>& compo_names,
-            const std::vector<std::uint32_t>& nid2compo,
-            const std::vector<std::uint32_t>& local_idx,
-            const std::vector<std::uint32_t>& seq_len,
-            uint64_t nid_offset = 1ULL,
-            size_t buffer_size = DEFAULT_BUFFER_SIZE
-            );
-
         /**
          * @brief Writes a CDX v1 file from array representations of graph nodes.
          *
@@ -42,7 +29,7 @@ namespace  cdx {
         static void write_cdx_file(
             const std::string& output_path,
             const std::vector<std::string>& compo_names,
-            const std::vector<std::uint32_t>& nid2compo,
+            const std::vector<std::uint16_t>& nid2compo,
             const std::vector<std::uint32_t>& local_idx,
             const std::vector<std::uint32_t>& seq_len,
             std::uint64_t nid_offset = 1ULL,
@@ -55,7 +42,7 @@ namespace  cdx {
         static void write_cdx_zstd_file(
             const std::string& output_path,
             const std::vector<std::string>& compo_names,
-            const std::vector<std::uint32_t>& nid2compo,
+            const std::vector<std::uint16_t>& nid2compo,
             const std::vector<std::uint32_t>& local_idx,
             const std::vector<std::uint32_t>& seq_len,
             int compression_level = 3,
@@ -65,6 +52,20 @@ namespace  cdx {
 
 
     private:
+
+        /*
+         * A writing stream of CDX format v1 that can be passed to any writing format
+         */
+        static void write_cdx_stream(
+            std::ostream& out,
+            const std::vector<std::string>& compo_names,
+            const std::vector<std::uint16_t>& nid2compo,
+            const std::vector<std::uint32_t>& local_idx,
+            const std::vector<std::uint32_t>& seq_len,
+            uint64_t nid_offset = 1ULL,
+            size_t buffer_size = DEFAULT_BUFFER_SIZE
+            );
+
         struct ComponentStats
         {
             uint64_t n_records  = 0;
@@ -79,11 +80,12 @@ namespace  cdx {
 
         /**
          * @brief Write the cdx to the TSV format (vers std::cout or a dedicated  std::ostream stream).
-         * Format : component_id \t idx \t nid \t start_pos \t length \n
+         * Format : compo_name \t component_id \t idx \t nid \t start_pos \t length \n
          */
         static void write_tsv(
             std::ostream &out,
-            const std::vector<uint32_t> &nid2compo,
+            const std::vector<std::string>& compo_names,
+            const std::vector<uint16_t> &nid2compo,
             const std::vector<uint32_t> &local_idx,
             const std::vector<uint32_t> &start_pos,
             const std::vector<uint32_t> &seq_len,

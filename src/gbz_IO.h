@@ -39,7 +39,7 @@ std::vector<uint16_t> get_graph_components(
 // bind the name of each connected component extracted from the paths the right component id
 std::vector<std::string> bind_component_names(
     const gbwtgraph::GBZ& gbz,
-    const std::vector<uint16_t>& nid2compo,
+    std::vector<uint16_t>& nid2compo,
     size_t max_steps_to_check = 0);
 
 // Count and return an estimate of the number of haplotype in the graph

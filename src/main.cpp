@@ -10,6 +10,7 @@
 #include "gbz_IO.h"
 #include "graph_indexing.h"
 #include "graph_linearization.h"
+#include "cdx_writer.h"
 
 
 int main()
@@ -18,7 +19,7 @@ int main()
 
     auto start = std::chrono::high_resolution_clock::now();
 
-    std::string gbz_path = "messy.gbz";
+    std::string gbz_path = "yeast.gbz";
     std::ifstream in(gbz_path, std::ios::binary);
     if (!in) {
         std::cerr << "Erreur : Impossible d'ouvrir " << gbz_path << std::endl;
@@ -48,15 +49,16 @@ int main()
 
     // calcul de la taille nécessaire des arrays
     cfg::ARRAY_SIZE = static_cast<size_t>(max_nid) + 1;
+
     // calcul de la densité du graphe
     const auto span = static_cast<double>(max_nid - min_nid + 1);
     const auto density = static_cast<double>(cfg::NB_NODES) / span;
 
-    // 3. Affichage formaté à 3 décimales
+    // Affichage formaté à 3 décimales
     std::cout << std::fixed << std::setprecision(3);
     std::cout << "Found " << cfg::NB_NODES << " nodes (index density: " << density << ") in the graph\n";
 
-    // On peut toujours lire le nombre de noeuds et chemins via gbz.graph
+    // On peut toujours lire le nombre de nœuds et chemins via gbz.graph
     std::cout << "Paths: " << gbz.graph.get_path_count() << "\n\n";
 
     end = std::chrono::high_resolution_clock::now();
@@ -75,9 +77,9 @@ int main()
     // retrieve length and nid of every node in the graphe via gbz handle
     gbz.graph.for_each_handle([&](const handlegraph::handle_t& handle) -> bool {
         const handlegraph::nid_t nid = gbz.graph.get_id(handle);
-        const size_t node_lenght = gbz.graph.get_length(handle);
+        const size_t node_length = gbz.graph.get_length(handle);
 
-        n_len[nid] = static_cast<uint32_t>(node_lenght);    // valid node get their length
+        n_len[nid] = static_cast<uint32_t>(node_length);    // valid node get their length
         parent[nid] = static_cast<uint32_t>(nid);           // valid node start each in their own component
         children[nid] = 0;                                  // valid node start with no child
 
@@ -91,7 +93,7 @@ int main()
     start = std::chrono::high_resolution_clock::now();
 
     // attribute each node to it's graph's connected component
-    std::vector<uint16_t> nid2compo = get_graph_components(gbz.graph, parent, children);
+    std::vector<std::uint16_t> nid2compo = get_graph_components(gbz.graph, parent, children);
 
     end = std::chrono::high_resolution_clock::now();
     elapsed = end - start;
@@ -175,7 +177,7 @@ int main()
     std::chrono::duration<double> elapsed_midpoint = end_midpoint - start_midpoint;
     std::cerr << "[INFO] Midpoint calculé en " << elapsed_midpoint.count() << " s\n" << std::endl;
 
-    //  local building the local index for each component
+    // building the local index for each component
     auto start_sort = std::chrono::high_resolution_clock::now();
     std::vector<uint32_t> idx_table = assign_local_idx(
         nid2compo,
@@ -186,9 +188,51 @@ int main()
     std::chrono::duration<double> elapsed_sort = end_sort - start_sort;
     std::cerr << "[INFO] Attribution des idx local termine en " << elapsed_sort.count() << " s\n" << std::endl;
 
-    // TSV debug output
+    // CDX output
+    auto start_output = std::chrono::high_resolution_clock::now();
+    const std::string output_file =  "graph.cdx";
+    cdx::CdxWriter::write_cdx_file(
+        output_file,
+        component_names,
+        nid2compo,
+        idx_table,
+        n_len
+    );
+    auto end_output = std::chrono::high_resolution_clock::now();
+    std::chrono::duration<double> elapsed_output = end_output - start_output;
+    std::cerr << "[INFO] Output écrit au format CDX en " << elapsed_output.count() << " s\n" << std::endl;
 
-    // CDX output and compress output
+    // compressed CDX outpout
+    auto start_compressed_output = std::chrono::high_resolution_clock::now();
+    const std::string compressed_output_file =  "graph.cdx.zstd";
+    cdx::CdxWriter::write_cdx_zstd_file(
+        compressed_output_file,
+        component_names,
+        nid2compo,
+        idx_table,
+        n_len
+    );
+    auto end_compressed_output = std::chrono::high_resolution_clock::now();
+    std::chrono::duration<double> elapsed_compression = end_compressed_output - start_compressed_output;
+    std::cerr << "[INFO] Output écrit au format CDX compressé en " <<
+        elapsed_compression.count() << " s\n" << std::endl;
+
+    // TSV output
+    auto start_tsv_output = std::chrono::high_resolution_clock::now();
+    std::ofstream tsv_out("graph.tsv");
+
+    cdx::TsvWriter::write_tsv(
+        tsv_out,
+        component_names,
+        nid2compo,
+        idx_table,
+        relaxed_positions,
+        n_len
+    );
+    auto end_tsv_output = std::chrono::high_resolution_clock::now();
+    std::chrono::duration<double> elapsed_tsv = end_tsv_output - start_tsv_output;
+    std::cerr << "[INFO] Output écrit au format TSV en " <<  elapsed_tsv.count() << " s\n" << std::endl;
+
 
     auto total_end = std::chrono::high_resolution_clock::now();
     std::chrono::duration<double> total_elapsed = total_end - total_start;

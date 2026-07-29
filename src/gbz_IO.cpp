@@ -148,24 +148,22 @@ std::string extract_compo_name(const gbwtgraph::GBZ& gbz, const handlegraph::pat
 
 
 /**
- * @brief Binds each connected component ID to its corresponding path-derived contig name.
- *
- * Iterates through paths in the GBZ graph, maps nodes to component IDs via `nid2compo`,
- * and validates that paths do not cross multiple connected components. Assigns a unique,
- * non-conflicting contig name to each component identifier.
+ * @brief Binds connected component IDs to path-derived contig names, sorts them according
+ *        to biological precedence, and updates `nid2compo` in-place so that CIDs match this order.
  *
  * @param gbz A constant reference to the gbwtgraph::GBZ object.
- * @param nid2compo A constant reference to the vector mapping node indices to component IDs.
- * @param max_steps_to_check Maximum number of steps to validate per path. Set to 0 for unlimited validation.
- * @return std::vector<std::string> A vector mapping each component ID to its contig name.
+ * @param nid2compo Reference to the vector mapping node indices to component IDs (modified in-place).
+ * @param max_steps_to_check Maximum steps to validate per path (0 for unlimited).
+ * @return std::vector<std::string> Sorted component names where index == new component_id.
  */
 std::vector<std::string> bind_component_names(
     const gbwtgraph::GBZ& gbz,
-    const std::vector<uint16_t>& nid2compo,
+    std::vector<uint16_t>& nid2compo,
     const size_t max_steps_to_check)
 {
-    std::vector<std::string> component_names(cfg::N_COMPO);
+    std::vector<std::string> raw_component_names(cfg::N_COMPO);
 
+    // 1. Assign raw component names based on GBZ paths
     gbz.graph.for_each_path_handle(
         [&](const handlegraph::path_handle_t& path) -> bool {
             const std::string path_name = gbz.graph.get_path_name(path);
@@ -177,7 +175,6 @@ std::vector<std::string> bind_component_names(
             gbz.graph.for_each_step_in_path(
                 path,
                 [&](const handlegraph::step_handle_t& step) -> bool {
-                    // Stop checking if a limit > 0 is defined and reached
                     if (max_steps_to_check > 0 && steps_checked >= max_steps_to_check) {
                         return false;
                     }
@@ -196,7 +193,7 @@ std::vector<std::string> bind_component_names(
                         throw std::runtime_error("Path " + path_name + " contains a node without a component");
                     }
 
-                    if (component_id >= component_names.size()) {
+                    if (component_id >= raw_component_names.size()) {
                         throw std::runtime_error("Invalid component ID " + std::to_string(component_id) +
                                                  " for node " + std::to_string(nid));
                     }
@@ -213,12 +210,11 @@ std::vector<std::string> bind_component_names(
                 }
             );
 
-            // Ignore empty paths.
             if (path_component == cfg::NODE_UNSEEN_16) {
                 return true;
             }
 
-            std::string& assigned_name = component_names[path_component];
+            std::string& assigned_name = raw_component_names[path_component];
 
             if (assigned_name.empty()) {
                 assigned_name = component_name;
@@ -233,9 +229,9 @@ std::vector<std::string> bind_component_names(
         }
     );
 
-    // Ensure every connected component was assigned a path name.
-    for (size_t component_id = 0; component_id < component_names.size(); ++component_id) {
-        if (component_names[component_id].empty()) {
+    // 2. Validate that every connected component was assigned a path name
+    for (size_t component_id = 0; component_id < raw_component_names.size(); ++component_id) {
+        if (raw_component_names[component_id].empty()) {
             throw std::runtime_error(
                 "Connected component " + std::to_string(component_id) +
                 " has no associated path name"
@@ -243,7 +239,46 @@ std::vector<std::string> bind_component_names(
         }
     }
 
-    return component_names;
+    // 3. Pre-extract/normalize component names to avoid calling std::regex inside std::sort
+    std::vector<std::string> normalized_names(cfg::N_COMPO);
+    for (size_t cid = 0; cid < cfg::N_COMPO; ++cid) {
+        normalized_names[cid] = detail::extract_compo_robust(raw_component_names[cid]);
+    }
+
+    // 4. Compute permutation vector based on biological sorting rules
+    std::vector<uint16_t> order(cfg::N_COMPO);
+    std::iota(order.begin(), order.end(), static_cast<uint16_t>(0));
+
+    std::sort(order.begin(), order.end(), [&](uint16_t a, uint16_t b) {
+        return detail::compare_compo_names(normalized_names[a], normalized_names[b]);
+    });
+
+    // 5. Build inverse lookup table (old_cid -> new_cid)
+    std::vector<uint16_t> cid_remap(cfg::N_COMPO);
+    for (uint16_t new_cid = 0; new_cid < cfg::N_COMPO; ++new_cid) {
+        cid_remap[order[new_cid]] = new_cid;
+    }
+
+    // 6. In-place update of nid2compo to match biological CIDs
+    for (uint16_t& cid : nid2compo) {
+        if (cid == cfg::NODE_UNSEEN_16) continue;
+        cid = cid_remap[cid];
+    }
+
+    // 7. Reorder raw component names according to the new CIDs
+    std::vector<std::string> sorted_component_names(cfg::N_COMPO);
+    for (uint16_t old_cid = 0; old_cid < cfg::N_COMPO; ++old_cid) {
+        sorted_component_names[cid_remap[old_cid]] = std::move(raw_component_names[old_cid]);
+    }
+
+#ifndef NDEBUG
+    // Optional debug printing to stdout/stderr to verify mapping in dev builds
+    for (size_t cid = 0; cid < sorted_component_names.size(); ++cid) {
+        std::cerr << "[bind_component_names] CID " << cid << " -> " << sorted_component_names[cid] << '\n';
+    }
+#endif
+
+    return sorted_component_names;
 }
 
 

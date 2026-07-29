@@ -104,6 +104,8 @@ add_executable(cdx_builder
         src/cdx_format.h
         src/cdx_writer.cpp
         src/cdx_writer.h
+        src/cli.cpp
+        src/cli.h
 )
 
 target_include_directories(cdx_builder PRIVATE
