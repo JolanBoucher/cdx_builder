@@ -2,24 +2,25 @@
 #include <CLI/CLI.hpp>
 #include <filesystem>
 
-CliArgs parse_args(int argc, char** argv)
+CliArgs parse_args(const int argc, char** argv)
 {
     CliArgs args;
 
+    // Initialize CLI11 application with tool description
     CLI::App app{
         "Build CDX indexes derived from GBZ pangenome graphs."
     };
 
     app.usage("cdx_builder <input.gbz> [OPTIONS]");
 
-    // Declaration of the positional argument
+    // Declaration of the mandatory positional input argument
     app.add_option(
         "input",
         args.input_file,
         "Input GBZ file containing the pangenomic graph to index."
-    )->required() ->type_name("gbz");
+    )->required()->type_name("gbz");
 
-    // Option Groups Setup
+    // Option Groups Setup for structured help output
     auto* group_linearization = app.add_option_group("Linearization Options");
     auto* group_output = app.add_option_group("Output Options");
 
@@ -65,7 +66,7 @@ CliArgs parse_args(int argc, char** argv)
         "with '.cdx'."
     );
 
-
+    // Optional Zstandard compression flag with an optional level argument
     int comp_level = 3;
     auto* opt_compress = group_output->add_option(
         "-c,--compress",
@@ -76,9 +77,10 @@ CliArgs parse_args(int argc, char** argv)
         "for archival and file transfer rather than direct querying. "
         "Default 3."
     )->check(CLI::Range(1, 22))
-     ->type_size(0, 1)    // Accepts 0 or 1 arguments
+     ->type_size(0, 1)    // Accepts 0 or 1 arguments (flag use defaults to level 3)
      ->default_str("3");
 
+    // Debug flag to dump human-readable text instead of binary
     auto* opt_debug = group_output->add_flag(
         "-d,--debug",
         args.debug,
@@ -87,10 +89,10 @@ CliArgs parse_args(int argc, char** argv)
         "development, testing, debugging, and pipeline validation."
     );
 
-    // Mutual exclusion between --compress and --debug
+    // Enforce mutual exclusivity between binary compression and debug TSV output
     opt_compress->excludes(opt_debug);
 
-    // Parsing & Help Handling
+    // Parse command line arguments and handle help/error exits gracefully
     try {
         app.parse(argc, argv);
     }
@@ -98,7 +100,7 @@ CliArgs parse_args(int argc, char** argv)
         std::exit(app.exit(e));
     }
 
-    // Assign compression level if flag was present
+    // Populate optional compression level if the compression option was triggered
     if (*opt_compress) {
         args.compression_level = comp_level;
     }
@@ -111,21 +113,25 @@ std::string prepare_output_filepath(
     const std::string& input_filepath,
     std::string ext)
 {
+    // Ensure the custom file extension starts with a leading dot
     if (!ext.empty() && ext.front() != '.') {
         ext = "." + ext;
     }
 
-    std::string base_path = output_filepath.empty() ? input_filepath : output_filepath;
+    // Fallback to input filename if no explicit output path was supplied
+    const std::string base_path = output_filepath.empty() ? input_filepath : output_filepath;
     if (base_path.empty()) return "";
 
     std::filesystem::path p(base_path);
     std::string filename = p.filename().string();
 
-    size_t dot_pos = filename.find('.');
+    // Strip compound extensions (e.g., '.gbz') from the base name before applying target extension
+    const size_t dot_pos = filename.find('.');
     if (dot_pos != std::string::npos) {
         p = p.parent_path() / filename.substr(0, dot_pos);
     }
 
+    // Replace final extension with the designated output format extension
     p.replace_extension(ext);
     return p.string();
 }
