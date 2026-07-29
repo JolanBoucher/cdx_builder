@@ -19,6 +19,7 @@ if(APPLE)
             "/opt/homebrew"
             "/opt/homebrew/opt/openssl@3"
             "/opt/homebrew/opt/zstd"
+            "/opt/homebrew/opt/cli11"
     )
 endif()
 
@@ -29,6 +30,7 @@ find_package(OpenSSL REQUIRED)
 
 find_library(ZSTD_LIBRARY NAMES zstd REQUIRED)
 find_path(ZSTD_INCLUDE_DIR NAMES zstd.h REQUIRED)
+find_package(CLI11 CONFIG REQUIRED)
 
 # ------------------------------------------------------------------------------
 # 1. External Dependency: libbdsg
@@ -105,7 +107,7 @@ add_executable(cdx_builder
         src/cdx_writer.cpp
         src/cdx_writer.h
         src/cli.cpp
-        src/cli.h
+        src/cli.hpp
 )
 
 target_include_directories(cdx_builder PRIVATE
@@ -123,6 +125,7 @@ target_link_libraries(cdx_builder PRIVATE
         ${ZSTD_LIBRARY}
         OpenMP::OpenMP_CXX
         Threads::Threads
+        CLI11::CLI11
         z
 )
 
