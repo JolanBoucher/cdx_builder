@@ -26,35 +26,31 @@ std::vector<uint32_t> calculate_midpoint(
     return midpoint;
 }
 
-//TODO (can be parallelized if slow)
+
 std::vector<uint32_t> assign_local_idx(
     const std::vector<uint16_t> &compo_by_node,
     const std::vector<uint32_t> &relaxed_start,
     const std::vector<uint32_t> &relaxed_midpoint)
 {
-   // we don't need to the vector size verification it's guaranty
-   // since all vector are initialized with cfg::ARRAY_SIZE
-
-    // we don't need to check overflow here
-    // it's supposed to be guarantied by the function building those vector
-
-    // initialize the output vector
+    // Initialize the output local index vector with the global unseen sentinel value
     std::vector<uint32_t> local_index(cfg::ARRAY_SIZE, cfg::NODE_UNSEEN_32);
 
-    // reserve a buffer of active node
+    // Reserve a buffer to store active node identifiers
     std::vector<uint32_t> active_nodes;
     active_nodes.reserve(cfg::ARRAY_SIZE);
 
-    // validation of node compo and coordinate before putting in the active node buffer
+    // Validate node components and coordinates before pushing them into the active node buffer
     for (std::size_t nid = 0; nid < cfg::ARRAY_SIZE; ++nid)
     {
+        // Skip nodes that have not been assigned a valid relaxed midpoint
         if (relaxed_midpoint[nid] == cfg::NODE_UNSEEN_32) continue;
 
         const uint32_t start = relaxed_start[nid];
         const uint16_t compo = compo_by_node[nid];
 
+        // Ensure active nodes possess valid start coordinates and component bindings
         if (start == cfg::NODE_UNSEEN_32 ) {
-            throw std::logic_error("Active node " + std:: to_string(nid) +
+            throw std::logic_error("Active node " + std::to_string(nid) +
                 " has no relaxed start coordinate.");
         }
         if (compo == cfg::NODE_UNSEEN_16) {
@@ -62,17 +58,19 @@ std::vector<uint32_t> assign_local_idx(
                 " is not attributed to any connected component.");
         }
 
-        // checking the number of component should not be checked in this function
+        // Component count boundaries are handled externally; collect valid active node ID
         active_nodes.push_back(static_cast<uint32_t>(nid));
     }
+
+    // Return early if no active nodes are found
     if (active_nodes.empty()) return local_index;
 
-    // extracting the raw pointers
+    // Extract raw pointers for optimal performance within the sorting lambda
     const uint16_t* compo_ptr = compo_by_node.data();
     const uint32_t* midpoint_ptr = relaxed_midpoint.data();
     const uint32_t* start_ptr = relaxed_start.data();
 
-    // Sort active node IDs lexicographically based on their spatial properties.
+    // Sort active node IDs lexicographically based on spatial and topological properties.
     // The comparator evaluates criteria sequentially until a tie is broken.
     std::sort(
         active_nodes.begin(),
@@ -104,22 +102,26 @@ std::vector<uint32_t> assign_local_idx(
         }
     );
 
-    // Attributing local rank
+    // Attribute sequential local ranks within each component group
     uint16_t curr_compo = compo_ptr[active_nodes.front()];
     uint32_t local_rank = 0;
 
     for (const uint32_t nid : active_nodes) {
         const uint16_t compo = compo_ptr[nid];
 
+        // Reset local rank counter when transitioning to a new component
         if (compo != curr_compo) {
             curr_compo = compo;
             local_rank = 0;
         }
-        // Security against overflow
+
+        // Guard against uint32_t index overflow for excessively large components
         if (local_rank == cfg::NODE_UNSEEN_32) {
-            throw std::overflow_error("A connected component contains too many nodes"
-                                      " for uint32_t local indices");
+            throw std::overflow_error("A connected component contains too many nodes "
+                                      "for uint32_t local indices.");
         }
+
+        // Assign local rank and increment counter
         local_index[nid] = local_rank;
         ++local_rank;
     }
