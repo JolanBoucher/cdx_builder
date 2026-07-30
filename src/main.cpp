@@ -1,5 +1,5 @@
 /**
-* @file main.cpp
+ * @file main.cpp
  * @brief Entry point for the CDX Index Builder executable.
  *
  * This file contains the main program logic for parsing command-line
