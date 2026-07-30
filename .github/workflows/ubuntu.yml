@@ -27,7 +27,8 @@ jobs:
             zlib1g-dev \
             libomp-dev \
             libboost-all-dev \
-            libcli11-dev
+            libcli11-dev \
+            libjansson-dev
 
       - name: Configure
         run: |
