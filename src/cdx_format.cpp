@@ -6,6 +6,7 @@
 
 namespace cdx
 {
+    // Converts a 32-bit unsigned integer to little-endian byte order.
     uint32_t CdxFormat::to_little_endian32(const uint32_t value) noexcept {
         if constexpr (IS_LITTLE_ENDIAN) return value;
 
@@ -21,8 +22,8 @@ namespace cdx
     #endif
     }
 
-    uint64_t CdxFormat::to_little_endian64(const uint64_t value) noexcept
-    {
+    // Converts a 64-bit unsigned integer to little-endian byte order.
+    uint64_t CdxFormat::to_little_endian64(const uint64_t value) noexcept {
         if constexpr (IS_LITTLE_ENDIAN) return value;
     #if defined(__GNUC__) || defined(__clang__)
         return __builtin_bswap64(value);
@@ -39,20 +40,20 @@ namespace cdx
     #endif
     }
 
-    uint32_t CdxFormat::from_little_endian32(const uint32_t value) noexcept
-    {
+    // Converts a 32-bit little-endian integer to native byte order.
+    uint32_t CdxFormat::from_little_endian32(const uint32_t value) noexcept{
         return to_little_endian32(value);
     }
 
-    uint64_t CdxFormat::from_little_endian64(const uint64_t value) noexcept
-    {
+    // Converts a 64-bit little-endian integer to native byte order.
+    uint64_t CdxFormat::from_little_endian64(const uint64_t value) noexcept{
         return to_little_endian64(value);
     }
 
+    // Serializes the global file header into the destination buffer with little-endian encoding.
     void CdxFormat::pack_file_header(
         char *destination,
-        const uint32_t component_count) noexcept
-    {
+        const uint32_t component_count) noexcept {
         CdxFileHeader header{};
         header.magic        = MAGIC;
         header.n_components = to_little_endian32(component_count);
@@ -62,14 +63,13 @@ namespace cdx
         std::memcpy(destination, &header, sizeof(header));
     }
 
-    // The component name bytes are serialized immediately after the fixed-size component header.
+    // Serializes a component block header into the destination buffer with little-endian encoding.
     void CdxFormat::pack_component_header(
         char* destination,
         const uint64_t record_count,
         const uint64_t minimum_node_id,
         const uint64_t maximum_node_id,
-        const uint32_t name_size) noexcept
-    {
+        const uint32_t name_size) noexcept {
         CdxComponentHeader header{};
         header.n_records   = to_little_endian64(record_count);
         header.node_id_min = to_little_endian64(minimum_node_id);
@@ -79,12 +79,12 @@ namespace cdx
         std::memcpy(destination, &header, sizeof(header));
     }
 
+    // Serializes an individual node record into the destination buffer with little-endian encoding.
     void CdxFormat::pack_node_record(
         char *destination,
         const uint64_t node_id,
         const uint32_t local_index,
-        const uint32_t sequence_length) noexcept
-    {
+        const uint32_t sequence_length) noexcept {
         CdxNodeRecord record{};
         record.node_id  = to_little_endian64(node_id);
         record.idx      = to_little_endian32(local_index);
@@ -93,16 +93,16 @@ namespace cdx
         std::memcpy(destination, &record, sizeof(record));
     }
 
-    CdxFileHeader CdxFormat::unpack_file_header(const char* source) noexcept
-    {
+    // Deserializes and converts the global file header from the source buffer into native byte order.
+    CdxFileHeader CdxFormat::unpack_file_header(const char* source) noexcept {
         CdxFileHeader header{};
         std::memcpy(&header, source, sizeof(header));
         header.n_components  = from_little_endian32(header.n_components);
         return header;
     }
 
-    CdxComponentHeader CdxFormat::unpack_component_header(const char* source) noexcept
-    {
+    // Deserializes and converts a component header from the source buffer into native byte order.
+    CdxComponentHeader CdxFormat::unpack_component_header(const char* source) noexcept {
         CdxComponentHeader header{};
         std::memcpy(&header, source, sizeof(header));
         header.n_records    = from_little_endian64(header.n_records);
@@ -112,8 +112,8 @@ namespace cdx
         return header;
     }
 
-    CdxNodeRecord CdxFormat::unpack_node_record(const char* source) noexcept
-    {
+    // Deserializes and converts a node record from the source buffer into native byte order.
+    CdxNodeRecord CdxFormat::unpack_node_record(const char* source) noexcept {
         CdxNodeRecord record{};
         std::memcpy(&record, source, sizeof(record));
         record.node_id      = from_little_endian64(record.node_id);
@@ -122,13 +122,13 @@ namespace cdx
         return record;
     }
 
-    bool CdxFormat::has_valid_magic(const CdxFileHeader& header) noexcept
-    {
+    // Validates whether the file header contains the expected CDX magic signature bytes.
+    bool CdxFormat::has_valid_magic(const CdxFileHeader& header) noexcept {
         return header.magic == MAGIC;
     }
 
-    bool CdxFormat::has_valid_widths(const CdxFileHeader& header) noexcept
-    {
+    // Validates whether the file header specifies supported node ID and sequence length byte widths.
+    bool CdxFormat::has_valid_widths(const CdxFileHeader& header) noexcept {
         return header.nid_width == NID_WIDTH &&
                header.seqlen_width == SEQLEN_WIDTH;
     }
