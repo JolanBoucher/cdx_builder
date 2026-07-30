@@ -21,11 +21,13 @@ jobs:
             build-essential \
             cmake \
             ninja-build \
+            git \
             libssl-dev \
             libzstd-dev \
             zlib1g-dev \
             libomp-dev \
-            libboost-all-dev
+            libboost-all-dev \
+            libcli11-dev
 
       - name: Configure
         run: |
