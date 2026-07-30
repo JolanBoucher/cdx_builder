@@ -61,8 +61,7 @@ ExternalProject_Add(
         BINARY_DIR "${SDSL_DIR}/build"
         CMAKE_ARGS
         -DCMAKE_BUILD_TYPE=${CMAKE_BUILD_TYPE}
-        BUILD_ALWAYS OFF
-        INSTALL_COMMAND ""
+        -DCMAKE_INSTALL_PREFIX=/usr/local
 )
 
 set(HANDLEGRAPH_INCLUDE_DIR "${LIBBDSG_DIR}/bdsg/deps/libhandlegraph/src/include")
