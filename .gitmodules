@@ -7,3 +7,6 @@
 [submodule "deps/gbwtgraph"]
 	path = deps/gbwtgraph
 	url = https://github.com/jltsiren/gbwtgraph.git
+[submodule "deps/sdsl-lite"]
+	path = deps/sdsl-lite
+	url = https://github.com/vgteam/sdsl-lite.git
