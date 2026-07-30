@@ -7,6 +7,7 @@
 #include <gbwtgraph/gbz.h>
 #include <gbwt/metadata.h>
 #include "constant.h"
+#include <stdexcept>
 
 namespace detail {
     /**

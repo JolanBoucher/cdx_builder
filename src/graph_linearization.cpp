@@ -11,6 +11,7 @@
 #include <vector>
 #include <boost/fusion/container/list/cons.hpp>
 #include <boost/graph/filtered_graph.hpp>
+#include <stdexcept>
 
 #ifdef _OPENMP
 #include <omp.h>

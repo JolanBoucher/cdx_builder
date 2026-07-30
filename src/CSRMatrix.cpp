@@ -5,6 +5,7 @@
 #include <stdexcept>
 #include <string>
 #include <utility>
+#include <cstdint>
 
 CSRMatrix::CSRMatrix(
     std::vector<Offset> forward_key,

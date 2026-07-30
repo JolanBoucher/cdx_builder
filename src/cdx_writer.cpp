@@ -11,6 +11,8 @@
 #include <zstd.h>
 #include "cdx_format.h"
 #include "constant.h"
+#include <charconv>
+#include <string>
 
 namespace cdx {
     // Serializes genomic graph node attributes into an uncompressed binary CDX format stream.

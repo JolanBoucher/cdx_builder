@@ -30,7 +30,7 @@ find_package(OpenSSL REQUIRED)
 
 find_library(ZSTD_LIBRARY NAMES zstd REQUIRED)
 find_path(ZSTD_INCLUDE_DIR NAMES zstd.h REQUIRED)
-find_package(CLI11 CONFIG REQUIRED)
+add_subdirectory(deps/CLI11)
 
 # ------------------------------------------------------------------------------
 # 1. External Dependency: libbdsg
@@ -41,6 +41,7 @@ set(BUILD_TESTING OFF CACHE BOOL "" FORCE)
 set(SDSL_BUILD_TESTS OFF CACHE BOOL "" FORCE)
 set(BUILD_TESTS OFF CACHE BOOL "" FORCE)
 set(BUILD_PYTHON OFF CACHE BOOL "" FORCE)
+set(BUILD_PYTHON_BINDINGS OFF CACHE BOOL "" FORCE)
 set(RUN_DOXYGEN OFF CACHE BOOL "" FORCE)
 
 add_subdirectory(deps/libbdsg)
@@ -67,14 +68,25 @@ ExternalProject_Add(
     INSTALL_COMMAND ""
 )
 
-set(HANDLEGRAPH_INCLUDE_DIR "${LIBBDSG_DIR}/bdsg/deps/libhandlegraph/src/include")
-set(HANDLEGRAPH_BUILD_DIR "${LIBBDSG_DIR}/bdsg/deps/libhandlegraph/build")
+set(HANDLEGRAPH_INCLUDE_DIR
+        "${LIBBDSG_DIR}/bdsg/deps/libhandlegraph/src/include")
 
-set(GBWT_LIBRARY "${GBWT_DIR}/lib/libgbwt.a")
-set(GBWTGRAPH_LIBRARY "${GBWTGRAPH_DIR}/lib/libgbwtgraph.a")
+set(HANDLEGRAPH_BUILD_DIR
+        "${LIBBDSG_DIR}/bdsg/deps/libhandlegraph/build")
 
-set(GBWT_INCLUDE_DIR "${GBWT_DIR}/include")
-set(GBWTGRAPH_INCLUDE_DIR "${GBWTGRAPH_DIR}/include")
+set(GBWT_LIBRARY
+        "${GBWT_DIR}/lib/libgbwt.a")
+
+set(GBWTGRAPH_LIBRARY
+        "${GBWTGRAPH_DIR}/lib/libgbwtgraph.a")
+
+set(GBWT_INCLUDE_DIR
+        "${GBWT_DIR}/include")
+
+set(GBWTGRAPH_INCLUDE_DIR
+        "${GBWTGRAPH_DIR}/include")
+
+# ---- GBWT ------------------------------------------------------
 
 ExternalProject_Add(
         gbwt_ext
@@ -87,13 +99,19 @@ ExternalProject_Add(
         BUILD_BYPRODUCTS "${GBWT_LIBRARY}"
 )
 
+# ---- GBWTGRAPH -------------------------------------------------
+
 ExternalProject_Add(
         gbwtgraph_ext
         DEPENDS gbwt_ext
         SOURCE_DIR "${GBWTGRAPH_DIR}"
         BUILD_IN_SOURCE 1
         CONFIGURE_COMMAND ""
-        BUILD_COMMAND make -j4 GBWT_DIR=${GBWT_DIR} CPPFLAGS=-I${HANDLEGRAPH_INCLUDE_DIR} LDFLAGS=-L${HANDLEGRAPH_BUILD_DIR}
+        BUILD_COMMAND
+        ${CMAKE_COMMAND} -E env
+        CPATH=${GBWT_INCLUDE_DIR}:${HANDLEGRAPH_INCLUDE_DIR}:/usr/local/include
+        LIBRARY_PATH=${LIBBDSG_DIR}/lib:${GBWT_DIR}/lib:/usr/local/lib
+        make -j4
         INSTALL_COMMAND ""
         BUILD_BYPRODUCTS "${GBWTGRAPH_LIBRARY}"
 )
@@ -101,11 +119,13 @@ ExternalProject_Add(
 add_dependencies(gbwtgraph_ext libbdsg)
 
 add_library(gbwt_lib STATIC IMPORTED)
-set_target_properties(gbwt_lib PROPERTIES IMPORTED_LOCATION "${GBWT_LIBRARY}")
+set_target_properties(gbwt_lib PROPERTIES
+        IMPORTED_LOCATION "${GBWT_LIBRARY}")
 add_dependencies(gbwt_lib gbwt_ext)
 
 add_library(gbwtgraph_lib STATIC IMPORTED)
-set_target_properties(gbwtgraph_lib PROPERTIES IMPORTED_LOCATION "${GBWTGRAPH_LIBRARY}")
+set_target_properties(gbwtgraph_lib PROPERTIES
+        IMPORTED_LOCATION "${GBWTGRAPH_LIBRARY}")
 add_dependencies(gbwtgraph_lib gbwtgraph_ext)
 
 # ------------------------------------------------------------------------------
@@ -127,6 +147,10 @@ add_executable(cdx_builder
         src/cdx_writer.h
         src/cli.cpp
         src/cli.hpp
+)
+
+set_target_properties(cdx_builder PROPERTIES
+        BUILD_RPATH "${LIBBDSG_DIR}/lib"
 )
 
 target_include_directories(cdx_builder PRIVATE
@@ -156,6 +180,10 @@ enable_testing()
 add_executable(run_tests
         tests/test_gbz_io.cpp
         src/gbz_IO.cpp
+)
+
+set_target_properties(run_tests PROPERTIES
+        BUILD_RPATH "${LIBBDSG_DIR}/lib"
 )
 
 target_include_directories(run_tests PRIVATE

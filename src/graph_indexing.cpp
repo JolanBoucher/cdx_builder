@@ -19,10 +19,11 @@
  */
 #include <vector>
 #include "graph_indexing.h"
-
+#include <stdexcept>
 #include <numeric>
-
+#include <algorithm>
 #include "constant.h"
+#include <stdexcept>
 
 std::vector<uint32_t> calculate_midpoint(
     const std::vector<uint32_t>& start_pos,

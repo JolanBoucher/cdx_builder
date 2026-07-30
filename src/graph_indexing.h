@@ -11,6 +11,7 @@
 #ifndef CDX_BUILDER_GRAPH_INDEXING_H
 #define CDX_BUILDER_GRAPH_INDEXING_H
 #include <vector>
+#include <cstdint>
 
 /**
  * @brief Computes the midpoint coordinate for each graph node based on its start position and length.
