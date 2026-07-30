@@ -17,6 +17,9 @@ cdx_builder
 
 # gbz test file
 *.gbz
+*.cdx
+*.zst
+*.tsv
 
 # Other
 token.txt

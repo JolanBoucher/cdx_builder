@@ -35,6 +35,11 @@ find_package(CLI11 CONFIG REQUIRED)
 # ------------------------------------------------------------------------------
 # 1. External Dependency: libbdsg
 # ------------------------------------------------------------------------------
+
+# Disable tests and optional targets from bundled dependencies.
+set(BUILD_TESTING OFF CACHE BOOL "" FORCE)
+set(SDSL_BUILD_TESTS OFF CACHE BOOL "" FORCE)
+set(BUILD_TESTS OFF CACHE BOOL "" FORCE)
 set(BUILD_PYTHON OFF CACHE BOOL "" FORCE)
 set(RUN_DOXYGEN OFF CACHE BOOL "" FORCE)
 
