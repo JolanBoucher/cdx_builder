@@ -10,3 +10,6 @@
 [submodule "deps/sdsl-lite"]
 	path = deps/sdsl-lite
 	url = https://github.com/vgteam/sdsl-lite.git
+[submodule "deps/CLI11"]
+	path = deps/CLI11
+	url = https://github.com/CLIUtils/CLI11.git
