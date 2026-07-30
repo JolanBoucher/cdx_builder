@@ -53,6 +53,17 @@ include(ExternalProject)
 set(GBWT_DIR "${CMAKE_CURRENT_SOURCE_DIR}/deps/gbwt")
 set(GBWTGRAPH_DIR "${CMAKE_CURRENT_SOURCE_DIR}/deps/gbwtgraph")
 set(LIBBDSG_DIR "${CMAKE_CURRENT_SOURCE_DIR}/deps/libbdsg")
+set(SDSL_DIR "${CMAKE_CURRENT_SOURCE_DIR}/deps/sdsl-lite")
+
+ExternalProject_Add(
+        sdsl_ext
+        SOURCE_DIR "${SDSL_DIR}"
+        BINARY_DIR "${SDSL_DIR}/build"
+        CMAKE_ARGS
+        -DCMAKE_BUILD_TYPE=${CMAKE_BUILD_TYPE}
+        BUILD_ALWAYS OFF
+        INSTALL_COMMAND ""
+)
 
 set(HANDLEGRAPH_INCLUDE_DIR "${LIBBDSG_DIR}/bdsg/deps/libhandlegraph/src/include")
 set(HANDLEGRAPH_BUILD_DIR "${LIBBDSG_DIR}/bdsg/deps/libhandlegraph/build")
@@ -65,6 +76,7 @@ set(GBWTGRAPH_INCLUDE_DIR "${GBWTGRAPH_DIR}/include")
 
 ExternalProject_Add(
         gbwt_ext
+        DEPENDS sdsl_ext
         SOURCE_DIR "${GBWT_DIR}"
         BUILD_IN_SOURCE 1
         CONFIGURE_COMMAND ""
