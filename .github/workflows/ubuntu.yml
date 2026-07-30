@@ -19,20 +19,6 @@ jobs:
         run: |
           git submodule update --init --recursive
 
-      - name: Debug submodules
-        run: |
-          echo "===== SUBMODULE STATUS ====="
-          git submodule status --recursive
-
-          echo "===== DEPS ====="
-          ls -la deps
-
-          echo "===== SDSL ====="
-          ls -la deps/sdsl-lite
-
-          echo "===== MAKE.HELPER ====="
-          ls -la deps/sdsl-lite/Make.helper
-
       - name: Install dependencies
         run: |
           sudo apt update
@@ -59,4 +45,4 @@ jobs:
 
       - name: Build
         run: |
-          cmake --build build -j4
+          cmake --build build --verbose -j4
