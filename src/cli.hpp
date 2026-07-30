@@ -24,8 +24,8 @@ struct CliArgs {
 
     // Linearization relaxation parameters
     int max_iterations = 100;               // Maximum relaxation iterations (-i, --iteration)
-    double threshold = 0.01;                // Convergence threshold (-t, --threshold)
-    double lambda_anchor = 0.7;             // Anchor regularization factor [0.0, 1.0] (-l, --lambda-anchor)
+    float threshold = 0.01;                // Convergence threshold (-t, --threshold)
+    float lambda_anchor = 0.7;             // Anchor regularization factor [0.0, 1.0] (-l, --lambda-anchor)
 
     // Output options
     std::string output_file;               // Path to the generated output CDX file (-o, --output)
