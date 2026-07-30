@@ -73,6 +73,21 @@ public:
         std::vector<Alpha>  backward_alpha
     );
 
+    /** @brief Deallocates all internal forward and backward CSR buffers and resets capacity to zero. */
+    void clear() noexcept {
+        // Forward storage
+        forward_key_.clear();     forward_key_.shrink_to_fit();
+        forward_nodes_.clear();   forward_nodes_.shrink_to_fit();
+        forward_weights_.clear(); forward_weights_.shrink_to_fit();
+        forward_alpha_.clear();   forward_alpha_.shrink_to_fit();
+
+        // Backward storage
+        backward_key_.clear();     backward_key_.shrink_to_fit();
+        backward_nodes_.clear();   backward_nodes_.shrink_to_fit();
+        backward_weights_.clear(); backward_weights_.shrink_to_fit();
+        backward_alpha_.clear();   backward_alpha_.shrink_to_fit();
+    }
+
     // --- Fast Inline Accessors ---
     /** @brief Returns the maximum number of nodes the matrix can index. */
     [[nodiscard]] size_t node_capacity() const noexcept {
