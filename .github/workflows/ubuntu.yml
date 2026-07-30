@@ -13,6 +13,25 @@ jobs:
         uses: actions/checkout@v4
         with:
           submodules: recursive
+          fetch-depth: 0
+
+      - name: Update submodules
+        run: |
+          git submodule update --init --recursive
+
+      - name: Debug submodules
+        run: |
+          echo "===== SUBMODULE STATUS ====="
+          git submodule status --recursive
+
+          echo "===== DEPS ====="
+          ls -la deps
+
+          echo "===== SDSL ====="
+          ls -la deps/sdsl-lite
+
+          echo "===== MAKE.HELPER ====="
+          ls -la deps/sdsl-lite/Make.helper
 
       - name: Install dependencies
         run: |
