@@ -42,7 +42,11 @@ jobs:
             -B build \
             -G Ninja \
             -DCMAKE_BUILD_TYPE=Release
-
+      
+      - name: Show generated Make.helper
+        run: |
+          find build -name Make.helper -exec echo "==== {} ====" \; -exec cat {} \;
+      
       - name: Build
         run: |
           cmake --build build --verbose -j4
