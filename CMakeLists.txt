@@ -56,13 +56,15 @@ set(LIBBDSG_DIR "${CMAKE_CURRENT_SOURCE_DIR}/deps/libbdsg")
 set(SDSL_DIR "${CMAKE_CURRENT_SOURCE_DIR}/deps/sdsl-lite")
 
 ExternalProject_Add(
-        sdsl_ext
-        SOURCE_DIR "${SDSL_DIR}"
-        BINARY_DIR "${CMAKE_BINARY_DIR}/sdsl_ext-build"
-        CMAKE_ARGS
+    sdsl_ext
+    SOURCE_DIR "${SDSL_DIR}"
+    BINARY_DIR "${CMAKE_BINARY_DIR}/sdsl_ext-build"
+    CMAKE_ARGS
         -DCMAKE_BUILD_TYPE=${CMAKE_BUILD_TYPE}
-        -DCMAKE_INSTALL_PREFIX=/usr/local
+        -DCMAKE_INSTALL_PREFIX=${CMAKE_BINARY_DIR}/sdsl-install
         -DCMAKE_POLICY_VERSION_MINIMUM=3.5
+
+    INSTALL_COMMAND ""
 )
 
 set(HANDLEGRAPH_INCLUDE_DIR "${LIBBDSG_DIR}/bdsg/deps/libhandlegraph/src/include")
