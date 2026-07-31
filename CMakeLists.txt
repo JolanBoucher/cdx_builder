@@ -65,7 +65,7 @@ ExternalProject_Add(
         -DCMAKE_INSTALL_PREFIX=${CMAKE_BINARY_DIR}/sdsl-install
         -DCMAKE_POLICY_VERSION_MINIMUM=3.5
 
-    INSTALL_COMMAND ""
+    INSTALL_COMMAND make install
 )
 
 set(HANDLEGRAPH_INCLUDE_DIR
@@ -96,7 +96,8 @@ ExternalProject_Add(
         CONFIGURE_COMMAND ""
         BUILD_COMMAND
         ${CMAKE_COMMAND} -E env
-        CPATH=${SDSL_DIR}/include:/usr/local/include
+        CPATH=${CMAKE_BINARY_DIR}/sdsl-install/include
+        LIBRARY_PATH=${CMAKE_BINARY_DIR}/sdsl-install/lib
         make -j4
         INSTALL_COMMAND ""
         BUILD_BYPRODUCTS "${GBWT_LIBRARY}"
