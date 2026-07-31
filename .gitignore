@@ -2,6 +2,7 @@
 cmake-build-debug/
 cmake-build-release/
 build/
+build-linux/
 
 # IDE files
 .idea/
@@ -25,4 +26,4 @@ cdx_builder
 token.txt
 
 .DS_Store
-**/ .DS_Store
+**/.DS_Store
