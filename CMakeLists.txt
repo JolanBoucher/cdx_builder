@@ -57,15 +57,15 @@ set(LIBBDSG_DIR "${CMAKE_CURRENT_SOURCE_DIR}/deps/libbdsg")
 set(SDSL_DIR "${CMAKE_CURRENT_SOURCE_DIR}/deps/sdsl-lite")
 
 ExternalProject_Add(
-    sdsl_ext
-    SOURCE_DIR "${SDSL_DIR}"
-    BINARY_DIR "${CMAKE_BINARY_DIR}/sdsl_ext-build"
-    CMAKE_ARGS
+        sdsl_ext
+        SOURCE_DIR "${SDSL_DIR}"
+        BINARY_DIR "${CMAKE_BINARY_DIR}/sdsl_ext-build"
+        CMAKE_ARGS
         -DCMAKE_BUILD_TYPE=${CMAKE_BUILD_TYPE}
         -DCMAKE_INSTALL_PREFIX=${CMAKE_BINARY_DIR}/sdsl-install
         -DCMAKE_POLICY_VERSION_MINIMUM=3.5
 
-    INSTALL_COMMAND make install
+        INSTALL_COMMAND ${CMAKE_COMMAND} --build . --target install -- -j1
 )
 
 set(HANDLEGRAPH_INCLUDE_DIR
@@ -96,8 +96,9 @@ ExternalProject_Add(
         CONFIGURE_COMMAND ""
         BUILD_COMMAND
         ${CMAKE_COMMAND} -E env
-        CPATH=${CMAKE_BINARY_DIR}/sdsl-install/include
-        LIBRARY_PATH=${CMAKE_BINARY_DIR}/sdsl-install/lib
+        CPATH=${CMAKE_CURRENT_SOURCE_DIR}/deps/sdsl-lite/include
+        LIBRARY_PATH=${LIBBDSG_DIR}/lib
+        LD_LIBRARY_PATH=${LIBBDSG_DIR}/lib
         make -j4
         INSTALL_COMMAND ""
         BUILD_BYPRODUCTS "${GBWT_LIBRARY}"
