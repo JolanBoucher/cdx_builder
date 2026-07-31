@@ -39,6 +39,7 @@
 #include <unordered_map>
 #include <utility>
 #include <vector>
+#include <cstddef>
 
 #include <gbwtgraph/gbz.h>
 

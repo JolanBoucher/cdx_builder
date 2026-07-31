@@ -20,6 +20,7 @@
 #include <cstdint>
 #include <unordered_map>
 #include <gbwtgraph/gbz.h>
+#include <cstddef>
 
 /**
  * @brief Extracts and returns a sorted vector of unique component names from a GBZ object.

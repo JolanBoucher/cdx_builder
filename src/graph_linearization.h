@@ -25,6 +25,7 @@
 #include <unordered_map>
 #include <vector>
 #include <cstdint>
+#include <cstddef>
 
 /**
  * @brief Bidirectional Compressed Sparse Row (CSR) matrix representation for graph topology and edge weights.
