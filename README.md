@@ -9,6 +9,10 @@ All bundled dependencies are built automatically by CMake:
 - libhandlegraph
 - GBWT
 - GBWTGraph
+- pkg-config
+- libboost-all-dev
+- libjansson-dev
+- g++ 11
 
 No manual compilation of dependencies is required.
 ### Linux (work on 24.04)

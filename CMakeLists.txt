@@ -94,7 +94,10 @@ ExternalProject_Add(
         SOURCE_DIR "${GBWT_DIR}"
         BUILD_IN_SOURCE 1
         CONFIGURE_COMMAND ""
-        BUILD_COMMAND make -j4
+        BUILD_COMMAND
+        ${CMAKE_COMMAND} -E env
+        CPATH=${SDSL_DIR}/include:/usr/local/include
+        make -j4
         INSTALL_COMMAND ""
         BUILD_BYPRODUCTS "${GBWT_LIBRARY}"
 )
