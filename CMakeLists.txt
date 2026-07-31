@@ -1,19 +1,46 @@
 cmake_minimum_required(VERSION 3.16)
 project(cdx_builder CXX)
 
+# ------------------------------------------------------------------------------
+# 0. Build Configuration
+# ------------------------------------------------------------------------------
+
+if(NOT CMAKE_BUILD_TYPE)
+    set(CMAKE_BUILD_TYPE Release CACHE STRING "Build type" FORCE)
+endif()
+
 set(CMAKE_CXX_STANDARD 17)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
 
 # ------------------------------------------------------------------------------
-# 0. System Dependencies (OpenMP, Threads, OpenSSL, zstd)
+# 1. Compiler Requirements
 # ------------------------------------------------------------------------------
+
+if(CMAKE_CXX_COMPILER_ID STREQUAL "GNU")
+    if(CMAKE_CXX_COMPILER_VERSION VERSION_LESS 11)
+        message(FATAL_ERROR
+                "GCC/G++ 11 or newer is required. "
+                "Detected version: ${CMAKE_CXX_COMPILER_VERSION}")
+    endif()
+endif()
+
+# ------------------------------------------------------------------------------
+# 2. System Dependencies
+# ------------------------------------------------------------------------------
+
 if(APPLE)
     # macOS-specific Homebrew paths
-    set(OpenMP_C_FLAGS "-Xpreprocessor -fopenmp -I/opt/homebrew/opt/libomp/include")
-    set(OpenMP_CXX_FLAGS "-Xpreprocessor -fopenmp -I/opt/homebrew/opt/libomp/include")
+
+    set(OpenMP_C_FLAGS
+            "-Xpreprocessor -fopenmp -I/opt/homebrew/opt/libomp/include")
+    set(OpenMP_CXX_FLAGS
+            "-Xpreprocessor -fopenmp -I/opt/homebrew/opt/libomp/include")
+
     set(OpenMP_C_LIB_NAMES "omp")
     set(OpenMP_CXX_LIB_NAMES "omp")
-    set(OpenMP_omp_LIBRARY "/opt/homebrew/opt/libomp/lib/libomp.dylib")
+
+    set(OpenMP_omp_LIBRARY
+            "/opt/homebrew/opt/libomp/lib/libomp.dylib")
 
     list(APPEND CMAKE_PREFIX_PATH
             "/opt/homebrew"
@@ -23,17 +50,31 @@ if(APPLE)
     )
 endif()
 
-# Standard dependency detection (Works natively on Linux!)
+# Standard dependencies
 find_package(OpenMP REQUIRED)
 find_package(Threads REQUIRED)
 find_package(OpenSSL REQUIRED)
+find_package(PkgConfig REQUIRED)
+find_package(Boost REQUIRED)
 
+# zstd
 find_library(ZSTD_LIBRARY NAMES zstd REQUIRED)
 find_path(ZSTD_INCLUDE_DIR NAMES zstd.h REQUIRED)
+
+# jansson
+pkg_check_modules(JANSSON REQUIRED jansson)
+
+message(STATUS "Found OpenMP")
+message(STATUS "Found OpenSSL")
+message(STATUS "Found zstd")
+message(STATUS "Found Boost")
+message(STATUS "Found Jansson")
+
+# CLI11
 add_subdirectory(deps/CLI11)
 
 # ------------------------------------------------------------------------------
-# 1. External Dependency: libbdsg
+# 3. External Dependency: libbdsg
 # ------------------------------------------------------------------------------
 
 # Disable tests and optional targets from bundled dependencies.
@@ -47,7 +88,7 @@ set(RUN_DOXYGEN OFF CACHE BOOL "" FORCE)
 add_subdirectory(deps/libbdsg)
 
 # ------------------------------------------------------------------------------
-# 2. External Dependencies: gbwt & gbwtgraph
+# 4. External Dependencies: gbwt & gbwtgraph
 # ------------------------------------------------------------------------------
 include(ExternalProject)
 
@@ -134,7 +175,7 @@ set_target_properties(gbwtgraph_lib PROPERTIES
 add_dependencies(gbwtgraph_lib gbwtgraph_ext)
 
 # ------------------------------------------------------------------------------
-# 3. Main Executable Target
+# 5. Main Executable Target
 # ------------------------------------------------------------------------------
 add_executable(cdx_builder
         src/main.cpp
@@ -163,6 +204,8 @@ target_include_directories(cdx_builder PRIVATE
         ${GBWT_INCLUDE_DIR}
         ${GBWTGRAPH_INCLUDE_DIR}
         ${ZSTD_INCLUDE_DIR}
+        ${JANSSON_INCLUDE_DIRS}
+        ${Boost_INCLUDE_DIRS}
 )
 
 target_link_libraries(cdx_builder PRIVATE
@@ -171,6 +214,7 @@ target_link_libraries(cdx_builder PRIVATE
         gbwt_lib
         OpenSSL::Crypto
         ${ZSTD_LIBRARY}
+        ${JANSSON_LIBRARIES}
         OpenMP::OpenMP_CXX
         Threads::Threads
         CLI11::CLI11
@@ -178,7 +222,7 @@ target_link_libraries(cdx_builder PRIVATE
 )
 
 # ------------------------------------------------------------------------------
-# 4. Google Test
+# 6. Google Test
 # ------------------------------------------------------------------------------
 enable_testing()
 
