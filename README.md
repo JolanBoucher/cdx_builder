@@ -73,6 +73,9 @@ cdx_builder graph.gbz -l 0.3 -i 1000
 
 # Well-supported graph with consistent haplotype structure
 cdx_builder graph.gbz -l 0.95
+
+# Display help
+cdx_builder -h
 ```
 ---
 
@@ -185,20 +188,6 @@ cmake -S . \
       -DCMAKE_BUILD_TYPE=Release
 
 cmake --build build-macos
-```
-
----
-
-## Usage
-
-```bash
-./cdx_builder input.gbz
-```
-
-Display help:
-
-```bash
-./cdx_builder --help
 ```
 
 ---
