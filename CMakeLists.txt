@@ -30,7 +30,6 @@ endif()
 
 if(APPLE)
     # macOS-specific Homebrew paths
-
     set(OpenMP_C_FLAGS
             "-Xpreprocessor -fopenmp -I/opt/homebrew/opt/libomp/include")
     set(OpenMP_CXX_FLAGS
@@ -47,7 +46,11 @@ if(APPLE)
             "/opt/homebrew/opt/openssl@3"
             "/opt/homebrew/opt/zstd"
             "/opt/homebrew/opt/cli11"
+            "/opt/homebrew/opt/jansson"
     )
+
+    # Assure que le linker trouve les libs installées par brew dans /opt/homebrew/lib
+    link_directories(/opt/homebrew/lib)
 endif()
 
 # Standard dependencies

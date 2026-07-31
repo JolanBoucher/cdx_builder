@@ -500,15 +500,13 @@ std::pair<std::vector<uint32_t>, size_t> relax_topology(
 
         // Report iteration metrics
         std::cerr << "  - Iteration " << std::setw(3) << iter
-                  << " | mean: "  << std::fixed << std::setprecision(8) << std::setw(14) << mean_displacement << " bp"
-                  << " | RMS: "   << std::setw(14) << rms_displacement << " bp" << '\n';
+                  << " | mean: "  << std::fixed << std::setprecision(8) << std::setw(19) << mean_displacement << " bp"
+                  << " | RMS: "   << std::setw(18) << rms_displacement << " bp" << '\n';
 
         // Check convergence criterion against Root Mean Square displacement
         if (rms_displacement < convergence_threshold) {
             executed_iteration = iter;
-            std::cerr << "  - Convergence reached at iteration " << iter
-                      << ": RMS displacement " << std::fixed << std::setprecision(8) << rms_displacement
-                      << " bp < threshold " << std::setprecision(6) << convergence_threshold << " bp." << '\n';
+            std::cerr << "  - Convergence reached" << std::endl;
             break;
         }
     }

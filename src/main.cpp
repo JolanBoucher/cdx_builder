@@ -58,6 +58,13 @@ public:
         : name_(std::move(step_name)),
           start_(Clock::now()),
           uncaught_on_entry_(std::uncaught_exceptions()) {}
+    /**
+     * @brief Dynamically updates the step label displayed upon timer destruction.
+     * @param new_name The new string description for the timed step.
+     */
+    void update_name(std::string new_name) {
+        name_ = std::move(new_name);
+    }
 
     /**
      * @brief Destructor that computes elapsed time and logs completion or failure status.
@@ -92,7 +99,7 @@ private:
      * @param failed True if step failed due to an uncaught exception.
      */
     static void print_step_time(const std::string& step_name, const double seconds, const bool failed) {
-        std::cerr << "  - " << std::left << std::setw(38) << step_name
+        std::cerr << "  - " << std::left << std::setw(50) << step_name
                   << (failed ? " Failed after   " : " Completed in ")
                   << std::right << std::setw(7) << std::fixed
                   << std::setprecision(4) << seconds << " s\n";
@@ -140,9 +147,9 @@ static void run_pipeline(const CliArgs& args) {
     using Clock = std::chrono::steady_clock;
     const auto total_start = Clock::now();
 
-    std::cerr << "======================================================================\n";
-    std::cerr << "                         CDX BUILDER PIPELINE                         \n";
-    std::cerr << "======================================================================\n";
+    std::cerr << "=============================================================================\n";
+    std::cerr << "                                 CDX BUILDER                                 \n";
+    std::cerr << "=============================================================================\n";
 
     //------------------------------------------------------------------------------------
     // 1. Graph Loading & Memory Allocation
@@ -153,19 +160,28 @@ static void run_pipeline(const CliArgs& args) {
     gbwtgraph::GBZ gbz;
 
     {
-        ScopedTimer t("GBZ graph loaded");
+        ScopedTimer t("Loading GBZ graph...");
+
         std::ifstream in(gbz_path, std::ios::binary);
         if (!in) {
             throw std::runtime_error("Unable to open input GBZ file: " + gbz_path);
         }
         gbz.simple_sds_load(in);
+
+        // Initial validation and metrics
+        cfg::NB_NODES = gbz.graph.get_node_count();
+        if (cfg::NB_NODES == 0) {
+            throw std::runtime_error("The input GBZ graph contains no nodes.");
+        }
+
+        const std::size_t m_paths = gbz.index.sequences(); // or gbz.header.paths
+
+        // Update label formatted
+        t.update_name("GBZ graph loaded: " + std::to_string(cfg::NB_NODES) +
+                      " nodes on " + std::to_string(m_paths) + " paths");
     }
 
-    // Graph validation
-    cfg::NB_NODES = gbz.graph.get_node_count();
-    if (cfg::NB_NODES == 0) {
-        throw std::runtime_error("The input GBZ graph contains no nodes.");
-    }
+    // Threshold validation
     if (cfg::NB_NODES > cfg::NODE_UNSEEN_32) {
         throw std::overflow_error(
             "Graph node count (" + std::to_string(cfg::NB_NODES) +
@@ -222,19 +238,23 @@ static void run_pipeline(const CliArgs& args) {
         {
             ScopedTimer t("Connected components identified");
             nid2compo = get_graph_components(gbz.graph, parent, children);
+
+            t.update_name("Identified " + std::to_string(cfg::N_COMPO) + " connected components");
         }
     } // 'parent' and 'children' memory naturally freed here upon scope exit
 
     std::vector<std::string> component_names;
     {
-        ScopedTimer t("Component path names bound");
+        ScopedTimer t("Component path names binding");
         constexpr std::size_t max_step_to_check = 0; // 0 for full validation
         component_names = bind_component_names(gbz, nid2compo, max_step_to_check);
+        t.update_name("Bound " + std::to_string(component_names.size()) + " components path names");
     }
 
     {
-        ScopedTimer t("Haplotypes evaluated");
+        ScopedTimer t("Haplotypes evaluation");
         cfg::N_HAPLO = count_haplotypes(gbz.graph);
+        t.update_name("Found " + std::to_string(cfg::N_HAPLO) + " haplotypes in the graph");
     }
 
     //------------------------------------------------------------------------------------
@@ -278,7 +298,7 @@ static void run_pipeline(const CliArgs& args) {
     std::vector<std::uint32_t> relaxed_positions;
 
     {
-        const auto start = Clock::now();
+        ScopedTimer t("Relaxing topology...");
 
         auto [pos, iters] = relax_topology(
             matrix,
@@ -290,12 +310,7 @@ static void run_pipeline(const CliArgs& args) {
         );
         relaxed_positions = std::move(pos);
 
-        const double seconds = std::chrono::duration<double>(Clock::now() - start).count();
-
-        std::cerr << "  - " << std::left << std::setw(38)
-                  << ("Topology relaxed (" + std::to_string(iters) + " iterations)")
-                  << " Completed in " << std::right << std::setw(7) << std::fixed
-                  << std::setprecision(3) << seconds << " s\n";
+        t.update_name("Topology relaxed in " + std::to_string(iters) + " iterations");
     }
 
     // Deallocate relaxation intermediates
@@ -383,10 +398,10 @@ static void run_pipeline(const CliArgs& args) {
     const auto total_end = Clock::now();
     const std::chrono::duration<double> total_elapsed = total_end - total_start;
 
-    std::cerr << "\n======================================================================\n";
-    std::cerr << " [SUCCESS] Pipeline execution finished in "
+    std::cerr << "\n=============================================================================\n";
+    std::cerr << " [SUCCESS] Execution finished in "
               << std::fixed << std::setprecision(3) << total_elapsed.count() << " s\n";
-    std::cerr << "======================================================================\n";
+    std::cerr << "=============================================================================\n";
 }
 
 int main(const int argc, char** argv)

@@ -12,7 +12,8 @@ All bundled dependencies are built automatically by CMake:
 - pkg-config
 - libboost-all-dev
 - libjansson-dev
-- g++ 11
+- g++ 11/12
+- gcc 11/12
 
 No manual compilation of dependencies is required.
 ### Linux (work on 24.04)
