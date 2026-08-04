@@ -1,5 +1,5 @@
 /**
- * @file cdx_writer.h
+ * @file cdx_IO.h
  * @brief Binary (CDX) and plain-text (TSV) file serialization utilities for graph genomic nodes.
  *
  * This module provides serialization implementations for writing node-level
@@ -8,8 +8,8 @@
  * values (TSV) formats, incorporating debug-time topological density and index permutation validation.
  */
 
-#ifndef CDX_BUILDER_CDX_WRITER_H
-#define CDX_BUILDER_CDX_WRITER_H
+#ifndef CDX_LIB_CDX_IO_H
+#define CDX_LIB_CDX_IO_H
 
 #include <cstdint>
 #include <filesystem>
@@ -206,4 +206,4 @@ namespace cdx {
 
 } // namespace cdx
 
-#endif // CDX_BUILDER_CDX_WRITER_H
+#endif // CDX_LIB_CDX_IO_H

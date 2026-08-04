@@ -13,3 +13,6 @@
 [submodule "deps/CLI11"]
 	path = deps/CLI11
 	url = https://github.com/CLIUtils/CLI11.git
+[submodule "deps/cdx_lib"]
+	path = deps/cdx_lib
+	url = https://github.com/JolanBoucher/cdx_lib.git

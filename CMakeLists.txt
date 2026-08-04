@@ -29,28 +29,53 @@ endif()
 # ------------------------------------------------------------------------------
 
 if(APPLE)
-    # macOS-specific Homebrew paths
+    # Resolve the active Homebrew prefix instead of hardcoding /opt/homebrew,
+    # so this also works on Intel Macs (/usr/local) or custom Homebrew installs.
+    find_program(HOMEBREW_EXECUTABLE brew)
+    if(HOMEBREW_EXECUTABLE)
+        execute_process(
+                COMMAND ${HOMEBREW_EXECUTABLE} --prefix
+                OUTPUT_VARIABLE HOMEBREW_PREFIX
+                OUTPUT_STRIP_TRAILING_WHITESPACE
+        )
+    endif()
+    if(NOT HOMEBREW_PREFIX)
+        set(HOMEBREW_PREFIX "/opt/homebrew") # sensible default: Apple Silicon
+        message(WARNING "Homebrew not found on PATH; assuming prefix ${HOMEBREW_PREFIX}")
+    endif()
+
+    execute_process(
+            COMMAND ${HOMEBREW_EXECUTABLE} --prefix libomp
+            OUTPUT_VARIABLE HOMEBREW_LIBOMP_PREFIX
+            OUTPUT_STRIP_TRAILING_WHITESPACE
+            ERROR_QUIET
+    )
+    if(NOT HOMEBREW_LIBOMP_PREFIX)
+        set(HOMEBREW_LIBOMP_PREFIX "${HOMEBREW_PREFIX}/opt/libomp")
+    endif()
+
+    # Apple Clang does not ship OpenMP; use Homebrew's libomp explicitly.
     set(OpenMP_C_FLAGS
-            "-Xpreprocessor -fopenmp -I/opt/homebrew/opt/libomp/include")
+            "-Xpreprocessor -fopenmp -I${HOMEBREW_LIBOMP_PREFIX}/include")
     set(OpenMP_CXX_FLAGS
-            "-Xpreprocessor -fopenmp -I/opt/homebrew/opt/libomp/include")
+            "-Xpreprocessor -fopenmp -I${HOMEBREW_LIBOMP_PREFIX}/include")
 
     set(OpenMP_C_LIB_NAMES "omp")
     set(OpenMP_CXX_LIB_NAMES "omp")
 
     set(OpenMP_omp_LIBRARY
-            "/opt/homebrew/opt/libomp/lib/libomp.dylib")
+            "${HOMEBREW_LIBOMP_PREFIX}/lib/libomp.dylib")
 
     list(APPEND CMAKE_PREFIX_PATH
-            "/opt/homebrew"
-            "/opt/homebrew/opt/openssl@3"
-            "/opt/homebrew/opt/zstd"
-            "/opt/homebrew/opt/cli11"
-            "/opt/homebrew/opt/jansson"
+            "${HOMEBREW_PREFIX}"
+            "${HOMEBREW_PREFIX}/opt/openssl@3"
+            "${HOMEBREW_PREFIX}/opt/zstd"
+            "${HOMEBREW_PREFIX}/opt/cli11"
+            "${HOMEBREW_PREFIX}/opt/jansson"
     )
 
-    # Assure que le linker trouve les libs installées par brew dans /opt/homebrew/lib
-    link_directories(/opt/homebrew/lib)
+    # Make sure the linker finds Homebrew-installed libs.
+    link_directories("${HOMEBREW_PREFIX}/lib")
 endif()
 
 # Standard dependencies
@@ -178,7 +203,36 @@ set_target_properties(gbwtgraph_lib PROPERTIES
 add_dependencies(gbwtgraph_lib gbwtgraph_ext)
 
 # ------------------------------------------------------------------------------
-# 5. Main Executable Target
+# 5. External Dependency: cdx_lib (shared with cdx_coverage)
+# ------------------------------------------------------------------------------
+#
+# cdx_lib is shared between cdx_builder and cdx_coverage and is vendored here
+# as a git submodule under deps/cdx_lib (same convention as the other deps).
+#
+# If you cloned this repository without submodules, run:
+#   git submodule update --init --recursive
+#
+# CDX_LIB_DIR can be overridden (e.g. -DCDX_LIB_DIR=/path/to/cdx_lib) for
+# local development against a working copy that lives elsewhere.
+set(CDX_LIB_DIR "${CMAKE_CURRENT_SOURCE_DIR}/deps/cdx_lib" CACHE PATH
+        "Path to the cdx_lib source tree")
+
+if(NOT EXISTS "${CDX_LIB_DIR}/CMakeLists.txt")
+    message(FATAL_ERROR
+            "cdx_lib not found at ${CDX_LIB_DIR}.\n"
+            "Fetch it with:\n"
+            "    git submodule update --init --recursive\n"
+            "or point CDX_LIB_DIR at a local checkout, e.g.:\n"
+            "    cmake -S . -B build -DCDX_LIB_DIR=/path/to/cdx_lib")
+endif()
+
+add_subdirectory(
+        "${CDX_LIB_DIR}"
+        cdx_lib_build
+)
+
+# ------------------------------------------------------------------------------
+# 6. Main Executable Target
 # ------------------------------------------------------------------------------
 add_executable(cdx_builder
         src/main.cpp
@@ -190,12 +244,10 @@ add_executable(cdx_builder
         src/CSRMatrix.cpp
         src/graph_indexing.cpp
         src/graph_indexing.h
-        src/cdx_format.cpp
-        src/cdx_format.h
-        src/cdx_writer.cpp
-        src/cdx_writer.h
         src/cli.cpp
         src/cli.hpp
+        src/cdx_writer.cpp
+        src/cdx_writer.h
 )
 
 set_target_properties(cdx_builder PROPERTIES
@@ -212,6 +264,7 @@ target_include_directories(cdx_builder PRIVATE
 )
 
 target_link_libraries(cdx_builder PRIVATE
+        cdx_lib
         libbdsg
         gbwtgraph_lib
         gbwt_lib
@@ -225,7 +278,7 @@ target_link_libraries(cdx_builder PRIVATE
 )
 
 # ------------------------------------------------------------------------------
-# 6. Google Test
+# 7. Google Test
 # ------------------------------------------------------------------------------
 enable_testing()
 
