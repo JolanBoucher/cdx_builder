@@ -53,7 +53,16 @@ function(add_cdx_test NAME)
             BUILD_RPATH "${LIBBDSG_DIR}/lib"
     )
 
-    gtest_discover_tests(${NAME})
+    # Default DISCOVERY_TIMEOUT is 5s (CMake's default), which is too tight when
+    # discovery runs as a POST_BUILD step under a loaded parallel build (e.g. a
+    # `-j$(nproc)` build where many other heavy targets -- libbdsg, gbwt,
+    # gbwtgraph -- are linking concurrently and starving the discovery
+    # subprocess of CPU). A timeout there is a soft failure: CMake just falls
+    # back to a single "<name>_NOT_BUILT" placeholder test and prints a
+    # WARNING (easy to miss in a large build log) instead of failing the
+    # build, which silently leaves ctest with zero real tests registered for
+    # that module. Give it much more headroom.
+    gtest_discover_tests(${NAME} DISCOVERY_TIMEOUT 60)
 endfunction()
 
 # --- CSRMatrix: pure container/invariants, no external dependencies ----------
