@@ -58,9 +58,30 @@ while [[ $# -gt 0 ]]; do
 done
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
-cd "$SCRIPT_DIR"
+
+# Resolve the repository root regardless of where this script itself lives
+# (currently cmake/, but this keeps working even if it moves again): prefer
+# asking git, and fall back to "one directory up from the script" otherwise.
+if REPO_ROOT="$(git -C "$SCRIPT_DIR" rev-parse --show-toplevel 2>/dev/null)"; then
+    :
+else
+    REPO_ROOT="$(cd "$SCRIPT_DIR/.." && pwd)"
+fi
+cd "$REPO_ROOT"
 
 log() { printf '\n\033[1;34m==>\033[0m %s\n' "$1"; }
+
+# Container/root environments (e.g. building inside a Docker image as root)
+# typically don't have `sudo` installed at all -- just run apt directly there.
+if [[ "$(id -u)" -eq 0 ]]; then
+    SUDO=()
+elif command -v sudo >/dev/null 2>&1; then
+    SUDO=(sudo)
+else
+    echo "This script needs root privileges to install packages (apt), and 'sudo' is not" >&2
+    echo "available. Re-run as root, or install sudo first." >&2
+    exit 1
+fi
 
 # ------------------------------------------------------------------------------
 # 1. System packages
@@ -68,8 +89,8 @@ log() { printf '\n\033[1;34m==>\033[0m %s\n' "$1"; }
 
 log "Installing system dependencies (apt)"
 
-sudo apt-get update
-sudo apt-get install -y \
+"${SUDO[@]}" apt-get update
+"${SUDO[@]}" apt-get install -y \
     build-essential \
     cmake \
     ninja-build \
@@ -95,10 +116,10 @@ done
 
 if [[ -z "$GCC_BIN" ]]; then
     log "No GCC >= 11 found; installing gcc-11/g++-11 from ppa:ubuntu-toolchain-r/test"
-    sudo apt-get install -y software-properties-common
-    sudo add-apt-repository -y ppa:ubuntu-toolchain-r/test
-    sudo apt-get update
-    sudo apt-get install -y gcc-11 g++-11
+    "${SUDO[@]}" apt-get install -y software-properties-common
+    "${SUDO[@]}" add-apt-repository -y ppa:ubuntu-toolchain-r/test
+    "${SUDO[@]}" apt-get update
+    "${SUDO[@]}" apt-get install -y gcc-11 g++-11
     GCC_BIN="g++-11"
 fi
 

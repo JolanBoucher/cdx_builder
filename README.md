@@ -160,16 +160,17 @@ git submodule update --init --recursive
 
 ### One-command setup
 
-`install_ubuntu20.sh` installs every system package listed below (including a newer
+`cmake/install_ubuntu20.sh` installs every system package listed below (including a newer
 GCC if needed), fetches git submodules, configures and builds the project with
-CMake+Ninja, and runs the unit test suite:
+CMake+Ninja, and runs the unit test suite. Run it from the repository root (or anywhere,
+it resolves the repo root itself):
 
 ```bash
-./install_ubuntu20.sh
+./cmake/install_ubuntu20.sh
 ```
 
 Useful flags: `--no-tests` (build only, skip ctest), `--build-dir <dir>`,
-`--build-type <type>`, `--jobs <N>`, `--no-submodules`. Run `./install_ubuntu20.sh --help`
+`--build-type <type>`, `--jobs <N>`, `--no-submodules`. Run `./cmake/install_ubuntu20.sh --help`
 for the full list. The script is safe to re-run.
 
 ### Prerequisites (manual setup)
