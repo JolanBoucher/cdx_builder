@@ -8,6 +8,8 @@
 #include <cmath>
 #include <iomanip>
 #include <iostream>
+#include <sstream>
+#include <string>
 #include <vector>
 #include <boost/fusion/container/list/cons.hpp>
 #include <boost/graph/filtered_graph.hpp>
@@ -353,6 +355,67 @@ CSRMatrix build_csr_matrix(const std::unordered_map<uint64_t, uint32_t> &weights
     );
 }
 
+namespace {
+/**
+ * @brief Formats a double for logging, trimming trailing zeros down to the last significant digit.
+ *
+ * e.g. 0.01000000 -> "0.01", 0.124 -> "0.124", 100.0 -> "100". Used for human-facing progress
+ * messages where a value like a convergence threshold shouldn't be padded to a fixed number of
+ * decimals regardless of how many of them are actually meaningful.
+ */
+std::string format_trimmed(const double value) {
+    std::ostringstream oss;
+    oss << std::defaultfloat << std::setprecision(6) << value;
+    return oss.str();
+}
+} // namespace
+
+/**
+ * @brief Shifts relaxed coordinates by a uniform constant so the minimum active-node position is >= 0.
+ *
+ * `relax_topology`'s update rule has no explicit lower bound: each node's new position is a
+ * (lambda-regularized) weighted barycenter of its neighbors, offset by +/- their sequence
+ * lengths. When `lambda_factor` is small, the anchor term barely pulls positions back toward
+ * their original non-negative median offsets, so the system behaves like pure Laplacian
+ * smoothing -- which is invariant to a uniform translation of *all* coordinates (shifting every
+ * node by the same constant doesn't change any of the barycenter differences that drive
+ * convergence). The forward update adds a neighbor's length while the backward update subtracts
+ * the current node's length, so this "gauge" isn't perfectly symmetric; over enough iterations
+ * (as happens with a very low lambda, which converges slowly) that asymmetry lets the whole
+ * system drift in one direction until part of it lands below zero.
+ *
+ * Since only *relative* positions carry meaning here, the gauge is fixed post-hoc instead of
+ * being constrained iteration-by-iteration (which would distort local structure): this function
+ * finds the minimum position among active nodes and, if it's negative, shifts every active node
+ * by the same amount so the whole system sits at or above zero again. This preserves every
+ * pairwise distance and ordering computed during relaxation. Nodes not listed in `active_nodes`
+ * (isolated or non-existent nodes) are left untouched.
+ *
+ * @param active_nodes The active node metadata produced by relax_topology's node-filtering pass.
+ * @param nodes_pos In/out vector of continuous node positions, indexed by node id. Only entries
+ *        referenced by `active_nodes` are read or modified.
+ * @return double The magnitude of the shift that was applied (0.0 if none was necessary, e.g.
+ *         `active_nodes` is empty or the minimum position was already non-negative).
+ */
+double reanchor_to_nonnegative_origin(
+    const std::vector<ActiveNode>& active_nodes,
+    std::vector<double>& nodes_pos) {
+
+    if (active_nodes.empty()) return 0.0;
+
+    double min_active_pos = nodes_pos[active_nodes[0].nid];
+    for (size_t n = 1; n < active_nodes.size(); ++n) {
+        min_active_pos = std::min(min_active_pos, nodes_pos[active_nodes[n].nid]);
+    }
+
+    if (min_active_pos >= 0.0) return 0.0;
+
+    const double shift = -min_active_pos;
+    for (const auto& node : active_nodes) {
+        nodes_pos[node.nid] += shift;
+    }
+    return shift;
+}
 
 // Main function of the module
 std::pair<std::vector<uint32_t>, size_t> relax_topology(
@@ -414,6 +477,7 @@ std::pair<std::vector<uint32_t>, size_t> relax_topology(
     const double one_minus_lambda = 1.0 - lambda;
     const size_t n_active = active_nodes.size();
     int executed_iteration = max_iterations;
+    bool converged = false;
 
     // Main relaxation hot-loop: processes active node buffers across iterations
     for (int iter = 1; iter <= executed_iteration; ++iter) {
@@ -506,9 +570,31 @@ std::pair<std::vector<uint32_t>, size_t> relax_topology(
         // Check convergence criterion against Root Mean Square displacement
         if (rms_displacement < convergence_threshold) {
             executed_iteration = iter;
+            converged = true;
             std::cerr << "  - Convergence reached" << std::endl;
             break;
         }
+    }
+
+    // The loop above only announces success; if it ran every allotted iteration without ever
+    // dropping below the threshold, say so explicitly instead of finishing silently -- this is
+    // the only signal the caller gets (short of comparing executed_iteration to max_iterations
+    // themselves) that the result is the best effort found within the iteration budget, not a
+    // truly converged solution. Kept to a single short line to match the rest of this log.
+    if (!converged && max_iterations > 0) {
+        std::cerr << "  - Budget exhausted (" << max_iterations << " it.), threshold "
+                   << format_trimmed(convergence_threshold) << " bp not reached" << std::endl;
+    }
+
+    // Re-anchor the coordinate system to a non-negative origin if it drifted (see
+    // reanchor_to_nonnegative_origin's docstring for why this can happen, especially at low
+    // lambda). Only worth a log line when the drift was large enough to actually matter for the
+    // uint32 conversion below: double2uint32 rounds to the nearest integer, so any shift under
+    // 0.5 bp would have rounded back to 0 (or a positive value) on its own anyway -- reporting
+    // those would just be noise about a correction nobody needed.
+    const double reanchor_shift = reanchor_to_nonnegative_origin(active_nodes, nodes_pos);
+    if (reanchor_shift >= 0.5) {
+        std::cerr << "  - Coordinate drift detected; re-anchoring by +" << format_trimmed(reanchor_shift) << " bp" << '\n';
     }
 
     // Safely convert final continuous coordinates into 32-bit unsigned integers

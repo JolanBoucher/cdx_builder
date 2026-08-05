@@ -220,6 +220,37 @@ struct ActiveNode {
 
 
 /**
+ * @brief Shifts relaxed coordinates by a uniform constant so the minimum active-node position is >= 0.
+ *
+ * `relax_topology`'s update rule has no explicit lower bound: each node's new position is a
+ * (lambda-regularized) weighted barycenter of its neighbors, offset by +/- their sequence
+ * lengths. When `lambda_factor` is small, the anchor term barely pulls positions back toward
+ * their original non-negative median offsets, so the system behaves like pure Laplacian
+ * smoothing -- which is invariant to a uniform translation of *all* coordinates (shifting every
+ * node by the same constant doesn't change any of the barycenter differences that drive
+ * convergence). The forward update adds a neighbor's length while the backward update subtracts
+ * the current node's length, so this "gauge" isn't perfectly symmetric; over enough iterations
+ * (as happens with a very low lambda, which converges slowly) that asymmetry lets the whole
+ * system drift in one direction until part of it lands below zero.
+ *
+ * Since only *relative* positions carry meaning here, the gauge is fixed post-hoc instead of
+ * being constrained iteration-by-iteration (which would distort local structure): this function
+ * finds the minimum position among active nodes and, if it's negative, shifts every active node
+ * by the same amount so the whole system sits at or above zero again. This preserves every
+ * pairwise distance and ordering computed during relaxation. Nodes not listed in `active_nodes`
+ * (isolated or non-existent nodes) are left untouched.
+ *
+ * @param active_nodes The active node metadata produced by relax_topology's node-filtering pass.
+ * @param nodes_pos In/out vector of continuous node positions, indexed by node id. Only entries
+ *        referenced by `active_nodes` are read or modified.
+ * @return double The magnitude of the shift that was applied (0.0 if none was necessary, e.g.
+ *         `active_nodes` is empty or the minimum position was already non-negative).
+ */
+double reanchor_to_nonnegative_origin(
+    const std::vector<ActiveNode>& active_nodes,
+    std::vector<double>& nodes_pos);
+
+/**
  * @brief Executes the topological relaxation algorithm to optimize continuous node coordinates.
  *
  * Performs an iterative, parallelized coordinate relaxation process over the graph nodes
@@ -236,6 +267,10 @@ struct ActiveNode {
  * The system tracks convergence using Root Mean Square (RMS) displacement across active nodes,
  * terminating early if stability falls below the given `convergence_threshold` or when
  * `max_iterations` is reached. OpenMP is utilized for parallel execution on large node sets.
+ *
+ * Once the loop finishes, the resulting coordinates are passed through
+ * `reanchor_to_nonnegative_origin` (see its docstring) to correct for coordinate drift, which
+ * becomes especially pronounced at low `lambda_factor` values.
  *
  * @param matrix The bidirectional `CSRMatrix` containing graph adjacencies, weights, and alpha factors.
  * @param n_length Vector mapping node indices to their lengths (unseen nodes marked with `NODE_UNSEEN_32`).

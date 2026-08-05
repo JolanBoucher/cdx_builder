@@ -3,8 +3,9 @@
  * @brief Unit test suite for the graph linearization pipeline (src/graph_linearization.h/.cpp).
  *
  * Covers, in order:
- *   - build_csr_matrix (CSR construction + alpha trust-factor computation from an edge-weight map)
- *   - relax_topology   (iterative bidirectional coordinate relaxation solver)
+ *   - build_csr_matrix              (CSR construction + alpha trust-factor computation from an edge-weight map)
+ *   - relax_topology                (iterative bidirectional coordinate relaxation solver)
+ *   - reanchor_to_nonnegative_origin (post-relaxation drift correction, see its own docstring)
  *
  * `build_csr_key`, `fill_csr_matrix`, `compute_alpha_factors` and `double2uint32` are file-local
  * (declared and defined only in graph_linearization.cpp, not exposed in the header), so they are
@@ -322,4 +323,160 @@ TEST_F(CfgFixture, EmptyActiveSetConvergesOnFirstIteration) {
 
     // Zero active nodes -> RMS displacement is 0 on the very first pass -> converges immediately.
     EXPECT_EQ(iterations, 1u);
+}
+
+TEST_F(CfgFixture, ExhaustingMaxIterationsWithoutConvergingRunsTheFullBudget) {
+    // convergence_threshold is negative, which rms_displacement (always >= 0) can never satisfy,
+    // so the hot-loop is guaranteed to run every allotted iteration without ever taking the
+    // early-exit "Convergence reached" branch. This exercises the "exhausted the iteration
+    // budget" logging path (see relax_topology's post-loop `!converged` branch) and confirms the
+    // reported iteration count still reflects the full budget rather than some partial count.
+    cfg::ARRAY_SIZE = 3;
+    cfg::N_HAPLO = 1;
+
+    std::unordered_map<uint64_t, uint32_t> weights;
+    weights[pack_edge(1, 2)] = 1;
+    const CSRMatrix matrix = build_csr_matrix(weights);
+
+    const std::vector<uint32_t> n_length = {cfg::NODE_UNSEEN_32, 10, 10};
+    const std::vector<uint32_t> median_pos = {cfg::NODE_UNSEEN_32, 0, 1000};
+
+    const auto [result, iterations] = relax_topology(
+        matrix, n_length, median_pos,
+        /*convergence_threshold=*/-1.0f, /*max_iterations=*/7, /*lambda_factor=*/0.5f);
+
+    EXPECT_EQ(iterations, 7u);
+}
+
+TEST_F(CfgFixture, LowLambdaNeverProducesANegativeCoordinate) {
+    // Regression guard for the real bug reanchor_to_nonnegative_origin fixes: at a very low
+    // lambda_factor, the relaxation update is nearly pure Laplacian smoothing, which is invariant
+    // to a uniform coordinate shift and can drift into negative territory over many iterations.
+    // relax_topology must never throw here (double2uint32 would throw std::domain_error on any
+    // negative coordinate) regardless of how skewed the initial anchors are.
+    cfg::ARRAY_SIZE = 4;
+    cfg::N_HAPLO = 1;
+
+    std::unordered_map<uint64_t, uint32_t> weights;
+    weights[pack_edge(1, 2)] = 1;
+    weights[pack_edge(2, 3)] = 1;
+    const CSRMatrix matrix = build_csr_matrix(weights);
+
+    const std::vector<uint32_t> n_length = {cfg::NODE_UNSEEN_32, 10, 10, 10};
+    // Node 1 anchored near zero while its neighbors are anchored far away: with lambda this low,
+    // node 1's backward prediction (barycenter of node 2's position minus node 1's own length)
+    // can easily be pulled below zero before any re-anchoring is applied.
+    const std::vector<uint32_t> median_pos = {cfg::NODE_UNSEEN_32, 0, 5000, 5000};
+
+    std::pair<std::vector<uint32_t>, size_t> result_and_iterations;
+    ASSERT_NO_THROW(
+        result_and_iterations = relax_topology(
+            matrix, n_length, median_pos,
+            /*convergence_threshold=*/0.0001f, /*max_iterations=*/500, /*lambda_factor=*/0.001f)
+    );
+
+    const auto& result = result_and_iterations.first;
+    // uint32_t is unconditionally >= 0, but spell out the intent: no result was clamped/thrown
+    // away, every active node produced a real (non-sentinel) coordinate.
+    EXPECT_NE(result[1], cfg::NODE_UNSEEN_32);
+    EXPECT_NE(result[2], cfg::NODE_UNSEEN_32);
+    EXPECT_NE(result[3], cfg::NODE_UNSEEN_32);
+}
+
+// ============================================================================
+// 3. RE-ANCRAGE POST-RELAXATION (reanchor_to_nonnegative_origin)
+// ============================================================================
+//
+// Invariants / contract:
+//   - Reads/writes nodes_pos only at indices referenced by active_nodes; every other index (e.g.
+//     isolated/nonexistent nodes, or garbage left over from initialization) is left untouched.
+//   - No-op (returns 0.0, vector unchanged) when active_nodes is empty, or when the minimum
+//     active-node position is already >= 0.0 -- in particular exactly 0.0 does NOT trigger a
+//     shift (the check is strictly `< 0.0`).
+//   - When the minimum active-node position is negative, every active node is shifted by the
+//     exact same constant (the magnitude of that minimum), so all pairwise differences between
+//     active nodes are preserved -- this is a uniform translation, not a per-node clamp.
+//   - The returned double is exactly the magnitude of the shift that was applied.
+
+namespace {
+/// Builds a minimal ActiveNode for reanchor_to_nonnegative_origin tests, which only reads `.nid`.
+ActiveNode make_active_node(const uint32_t nid) {
+    return ActiveNode{nid, /*f_degree=*/0, /*b_degree=*/0, /*f_alpha=*/0.f, /*b_alpha=*/0.f,
+                       /*f_lo=*/0, /*b_lo=*/0};
+}
+} // namespace
+
+TEST(ReanchorToNonnegativeOriginTest, EmptyActiveNodesIsANoOp) {
+    std::vector<double> nodes_pos = {-5.0, -3.0, 10.0};
+
+    const double shift = reanchor_to_nonnegative_origin({}, nodes_pos);
+
+    EXPECT_EQ(shift, 0.0);
+    EXPECT_EQ(nodes_pos, (std::vector{-5.0, -3.0, 10.0})); // untouched, even though it has negatives
+}
+
+TEST(ReanchorToNonnegativeOriginTest, AllNonNegativePositionsRequireNoShift) {
+    const std::vector<ActiveNode> active_nodes = {make_active_node(1), make_active_node(2)};
+    std::vector<double> nodes_pos = {0.0, 0.0, 42.0};
+
+    const double shift = reanchor_to_nonnegative_origin(active_nodes, nodes_pos);
+
+    EXPECT_EQ(shift, 0.0);
+    EXPECT_EQ(nodes_pos[1], 0.0);
+    EXPECT_EQ(nodes_pos[2], 42.0);
+}
+
+TEST(ReanchorToNonnegativeOriginTest, ExactlyZeroMinimumDoesNotTriggerAShift) {
+    // Boundary check: the guard is `min_active_pos < 0.0`, so a minimum of exactly 0.0 must not
+    // apply any shift (an off-by-one here would harmlessly no-op with shift 0.0 anyway, but a
+    // `<=` mistake elsewhere could instead apply a spurious non-zero shift).
+    const std::vector<ActiveNode> active_nodes = {make_active_node(1), make_active_node(2)};
+    std::vector<double> nodes_pos = {0.0, 0.0, 7.5};
+
+    const double shift = reanchor_to_nonnegative_origin(active_nodes, nodes_pos);
+
+    EXPECT_EQ(shift, 0.0);
+    EXPECT_EQ(nodes_pos[1], 0.0);
+    EXPECT_EQ(nodes_pos[2], 7.5);
+}
+
+TEST(ReanchorToNonnegativeOriginTest, NegativeMinimumShiftsAllActiveNodesByItsMagnitude) {
+    const std::vector<ActiveNode> active_nodes = {make_active_node(1), make_active_node(2), make_active_node(3)};
+    std::vector<double> nodes_pos = {0.0, -2.5, 10.0, 100.0};
+
+    const double shift = reanchor_to_nonnegative_origin(active_nodes, nodes_pos);
+
+    EXPECT_EQ(shift, 2.5);
+    // The minimum now sits exactly at 0, and every other active node moved by the same amount.
+    EXPECT_EQ(nodes_pos[1], 0.0);
+    EXPECT_EQ(nodes_pos[2], 12.5);
+    EXPECT_EQ(nodes_pos[3], 102.5);
+}
+
+TEST(ReanchorToNonnegativeOriginTest, PreservesPairwiseDistancesBetweenActiveNodes) {
+    // The whole point of a uniform shift (vs. a per-node clamp) is that relative structure is
+    // untouched -- verify the pairwise differences survive exactly.
+    const std::vector<ActiveNode> active_nodes = {make_active_node(1), make_active_node(2), make_active_node(3)};
+    std::vector<double> nodes_pos = {0.0, -10.0, -4.0, 3.0};
+    const double before_2_minus_1 = nodes_pos[2] - nodes_pos[1];
+    const double before_3_minus_2 = nodes_pos[3] - nodes_pos[2];
+
+    reanchor_to_nonnegative_origin(active_nodes, nodes_pos);
+
+    EXPECT_DOUBLE_EQ(nodes_pos[2] - nodes_pos[1], before_2_minus_1);
+    EXPECT_DOUBLE_EQ(nodes_pos[3] - nodes_pos[2], before_3_minus_2);
+}
+
+TEST(ReanchorToNonnegativeOriginTest, LeavesInactiveIndicesUntouched) {
+    // active_nodes references only nid 2; nid 1's entry is deliberately garbage (e.g. what a
+    // never-visited node might still hold from initialization) and must survive unmodified even
+    // though it's more negative than the true active minimum.
+    const std::vector<ActiveNode> active_nodes = {make_active_node(2)};
+    std::vector<double> nodes_pos = {0.0, -9999.0, -1.0};
+
+    const double shift = reanchor_to_nonnegative_origin(active_nodes, nodes_pos);
+
+    EXPECT_EQ(shift, 1.0);
+    EXPECT_EQ(nodes_pos[1], -9999.0); // untouched: not referenced by active_nodes
+    EXPECT_EQ(nodes_pos[2], 0.0);
 }
