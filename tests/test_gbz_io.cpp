@@ -631,7 +631,7 @@ TEST_F(GbwtGraphTestFixture, NodeAbsentFromAnyPathKeepsSentinel) {
 }
 
 TEST_F(GbwtGraphTestFixture, MedianAggregatesOffsetsAcrossMultiplePaths) {
-    cfg::ARRAY_SIZE = 3;
+    cfg::ARRAY_SIZE = 4; // indices [0,3]: nodes go up to id 3 here, unlike the two tests above
     // Node 2 is visited by three paths with different prefix lengths, so it
     // is seen at three different offsets.
     const auto gbz = build_gbz({1, 2, 3}, {
