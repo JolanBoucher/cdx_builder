@@ -164,7 +164,13 @@ cmake --build "$BUILD_DIR" -j"$JOBS"
 
 if [[ "$RUN_TESTS" -eq 1 ]]; then
     log "Running unit tests (ctest)"
-    ctest --test-dir "$BUILD_DIR" --output-on-failure -j"$JOBS"
+    # `ctest --test-dir` only exists since CMake 3.20; Ubuntu 20.04's default
+    # cmake package is 3.16.3, where that flag is silently ignored and ctest
+    # falls back to looking for CTestTestfile.cmake in the current directory
+    # (finding nothing, since we build out-of-tree into $BUILD_DIR) --
+    # reporting "No tests were found!!!" instead of erroring. cd into the
+    # build directory instead, which works on every CMake/CTest version.
+    (cd "$BUILD_DIR" && ctest --output-on-failure -j"$JOBS")
 else
     log "Skipping tests (--no-tests)"
 fi
