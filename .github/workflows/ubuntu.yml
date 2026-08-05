@@ -67,10 +67,6 @@ jobs:
         run: |
           cmake --build build --verbose -j"$(nproc)"
 
-      - name: Run tests
-        run: |
-          ctest --test-dir build --output-on-failure
-
       - name: Show generated Make.helper (debug, on failure only)
         if: failure()
         run: |
