@@ -6,6 +6,7 @@
 #include <boost/xpressive/regex_primitives.hpp>
 #include <gbwtgraph/gbz.h>
 #include <gbwt/metadata.h>
+#include <gbwt/support.h>
 #include "constant.h"
 #include <stdexcept>
 
@@ -520,27 +521,48 @@ std::vector<uint32_t> compute_nodes_median_offset(const gbwtgraph::GBWTGraph &gr
 
 std::unordered_map<uint64_t, uint32_t> compute_edge_weights(const gbwtgraph::GBWTGraph &graph) {
     std::unordered_map<uint64_t, uint32_t> weights;
+
+    // A default-constructed/uninitialized GBWTGraph has no backing GBWT index.
+    if (graph.index == nullptr || !graph.index->hasMetadata()) {
+        return weights;
+    }
+
+    const gbwt::GBWT &index = *graph.index;
+    const gbwt::size_type n_paths = index.metadata.paths();
     weights.reserve(graph.get_edge_count());
 
-    graph.for_each_path_handle([&](const handlegraph::path_handle_t &path) -> bool {
-        handlegraph::nid_t previous_nid = 0;
-        bool has_previous_node = false;
+    // Native-gbwt fast path: pull each logical path's *forward* (canonical,
+    // insertion-order) node sequence directly out of the FM-index via
+    // GBWT::extract(), instead of walking the handlegraph abstraction
+    // (for_each_path_handle / for_each_step_in_path / get_handle_of_step),
+    // which allocates and virtually dispatches a handle per step.
+    //
+    // Why not use GBWT's built-in coverage/count primitives (e.g. extending a
+    // bidirectional SearchState across two nodes) instead? Because a
+    // bidirectional GBWT indexes every path together with its reverse
+    // complement as a *symmetric* pair of sequences -- index.count() for the
+    // oriented edge (u+ -> v+) is mathematically identical to
+    // index.count() for its mirror (v- -> u-), so there is no way to recover,
+    // from coverage alone, which of the two nid-orderings was the one
+    // actually inserted as "the" path (as opposed to its auto-generated
+    // reverse complement). Summing or otherwise combining both orientations'
+    // coverage either double-counts or discards that asymmetry, which is
+    // exactly the "unidirectional" requirement this function needs.
+    //
+    // GBWT::extract() does not have that problem: sequence id `2*p` is fixed
+    // by construction (gbwt::Path::encode(p, false)) to be whichever
+    // orientation was inserted first for logical path `p`, so extracting it
+    // reproduces the exact node order for_each_step_in_path would have
+    // yielded -- just without the handlegraph layer's per-step overhead.
+    for (gbwt::size_type p = 0; p < n_paths; ++p) {
+        const gbwt::vector_type sequence = index.extract(gbwt::Path::encode(p, false));
 
-        graph.for_each_step_in_path(path, [&](const handlegraph::step_handle_t &step) -> bool {
-            const handlegraph::handle_t handle = graph.get_handle_of_step(step);
-            const handlegraph::nid_t nid = graph.get_id(handle);
-
-            if (has_previous_node) {
-                const uint64_t edge_key = detail::pack_node_pair(previous_nid, nid);
-                weights[edge_key]++;
-            }
-
-            previous_nid = nid;
-            has_previous_node = true;
-            return true;
-        });
-        return true;
-    });
+        for (size_t i = 1; i < sequence.size(); ++i) {
+            const auto previous_nid = static_cast<handlegraph::nid_t>(gbwt::Node::id(sequence[i - 1]));
+            const auto nid = static_cast<handlegraph::nid_t>(gbwt::Node::id(sequence[i]));
+            weights[detail::pack_node_pair(previous_nid, nid)]++;
+        }
+    }
 
     return weights;
 }

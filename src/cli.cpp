@@ -92,12 +92,23 @@ CliArgs parse_args(const int argc, char** argv)
     // Enforce mutual exclusivity between binary compression and debug TSV output
     opt_compress->excludes(opt_debug);
 
-    // Parse command line arguments and handle help/error exits gracefully
+    // Parse command line arguments.
     try {
         app.parse(argc, argv);
     }
     catch (const CLI::ParseError& e) {
-        std::exit(app.exit(e));
+        // --help/--version (and other zero-exit-code CLI11 requests) are not really errors:
+        // terminate directly here so their formatted output and exit code behave as usual.
+        if (e.get_exit_code() == 0) {
+            std::exit(app.exit(e));
+        }
+        // A genuine parsing error (missing/invalid argument, range violation, mutually
+        // exclusive options, ...): let it propagate as an exception instead of calling
+        // std::exit() here, so callers -- including unit tests -- can catch and handle it
+        // safely rather than the whole process being torn down unconditionally. main()
+        // already has a generic `catch (const std::exception&)` that handles this correctly
+        // for production use.
+        throw;
     }
 
     // Populate optional compression level if the compression option was triggered
@@ -122,16 +133,15 @@ std::string prepare_output_filepath(
     const std::string base_path = output_filepath.empty() ? input_filepath : output_filepath;
     if (base_path.empty()) return "";
 
+    // std::filesystem::path::replace_extension() already replaces only the last
+    // "<dot><suffix>" component of the filename (its native definition of "extension"),
+    // so calling it directly is both sufficient and correct here -- no manual dot-finding
+    // needed. (A prior version of this function pre-stripped the extension by hand before
+    // calling replace_extension(); that was redundant and actually double-stripped
+    // multi-dot names like "sample.chr1.gbz", since replace_extension() would then also
+    // strip ".chr1" as if it were the extension, yielding "sample.cdx" instead of the
+    // intended "sample.chr1.cdx".)
     std::filesystem::path p(base_path);
-    std::string filename = p.filename().string();
-
-    // Strip compound extensions (e.g., '.gbz') from the base name before applying target extension
-    const size_t dot_pos = filename.find('.');
-    if (dot_pos != std::string::npos) {
-        p = p.parent_path() / filename.substr(0, dot_pos);
-    }
-
-    // Replace final extension with the designated output format extension
     p.replace_extension(ext);
     return p.string();
 }

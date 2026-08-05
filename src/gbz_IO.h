@@ -23,19 +23,6 @@
 #include <cstddef>
 
 /**
- * @brief Extracts and returns a sorted vector of unique component names from a GBZ object.
- *
- * Iterates through all path handles in the GBZ graph, extracts their component names,
- * filters for uniqueness, and sorts them using the biological comparison rules.
- *
- * @param gbz The GBZ graph and index object.
- * @return std::vector<std::string> A sorted vector of unique component/contig names.
- */
-std::vector<std::string> get_sorted_components(
-    const gbwtgraph::GBZ& gbz
-);
-
-/**
  * @brief Computes edge weights based on co-occurrences along paths in the forward direction.
  *
  * @param graph The GBWTGraph / GBZ graph.

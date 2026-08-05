@@ -278,38 +278,14 @@ target_link_libraries(cdx_builder PRIVATE
 )
 
 # ------------------------------------------------------------------------------
-# 7. Google Test
+# 7. Unit Tests (Google Test)
 # ------------------------------------------------------------------------------
-enable_testing()
+#
+# Each testable module gets its own executable, declared in tests/CMakeLists.txt,
+# linked only against the dependencies it actually needs.
+option(CDX_BUILDER_BUILD_TESTS "Build the cdx_builder unit test suites" ON)
 
-add_executable(run_tests
-        tests/test_gbz_io.cpp
-        src/gbz_IO.cpp
-)
-
-set_target_properties(run_tests PROPERTIES
-        BUILD_RPATH "${LIBBDSG_DIR}/lib"
-)
-
-target_include_directories(run_tests PRIVATE
-        ${CMAKE_CURRENT_SOURCE_DIR}/src
-        ${GBWT_INCLUDE_DIR}
-        ${GBWTGRAPH_INCLUDE_DIR}
-        ${ZSTD_INCLUDE_DIR}
-)
-
-target_link_libraries(run_tests PRIVATE
-        gtest_main
-        gtest
-        libbdsg
-        gbwtgraph_lib
-        gbwt_lib
-        OpenSSL::Crypto
-        ${ZSTD_LIBRARY}
-        OpenMP::OpenMP_CXX
-        Threads::Threads
-        z
-)
-
-include(GoogleTest)
-gtest_discover_tests(run_tests)
+if(CDX_BUILDER_BUILD_TESTS)
+    enable_testing()
+    add_subdirectory(tests)
+endif()

@@ -42,7 +42,12 @@ struct CliArgs {
  * @param argc Argument count from main.
  * @param argv Argument vector from main.
  * @return CliArgs Populated configuration structure.
- * @throws CLI::ParseError On parsing error or help request.
+ * @throws CLI::ParseError On a genuine parsing error (missing/invalid argument, range
+ *         violation, mutually exclusive options, ...). Callers are expected to catch this
+ *         (CLI::ParseError derives from std::exception).
+ * @note A `--help`/`--version` request (or any other CLI11 request with exit code 0) is
+ *       handled internally and terminates the process directly via `std::exit`, matching
+ *       standard CLI11 UX -- it does not throw back to the caller.
  */
 CliArgs parse_args(int argc, char** argv);
 
