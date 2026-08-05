@@ -106,9 +106,14 @@ cdx_builder -h
 | libhandlegraph| Graph interface used by libbdsg            |
 | libbdsg       | Pangenome graph backend (GBZ support)      |
 | CLI11         | Command-line argument parsing              |
+| GoogleTest    | Unit test framework (only when building tests) |
 | **cdx_lib**   | CDX format/IO code shared with `cdx_coverage` |
 
-All of the above (except cdx_lib) live under `deps/` as git submodules of this repository.
+GoogleTest is fetched and built from source automatically via CMake's `FetchContent`
+(see `cmake/FetchGoogleTest.cmake`) — no submodule or system package needed.
+
+All of the above (except cdx_lib and GoogleTest) live under `deps/` as git submodules of
+this repository.
 `cdx_lib` is a **separate repository**, vendored the same way as `deps/cdx_lib` — see
 [Getting the code](#getting-the-code) below.
 
@@ -153,9 +158,23 @@ git submodule update --init --recursive
 
 ## Linux (Ubuntu 20.04+)
 
-### Prerequisites
+### One-command setup
 
-Install the required system packages:
+`install_ubuntu20.sh` installs every system package listed below (including a newer
+GCC if needed), fetches git submodules, configures and builds the project with
+CMake+Ninja, and runs the unit test suite:
+
+```bash
+./install_ubuntu20.sh
+```
+
+Useful flags: `--no-tests` (build only, skip ctest), `--build-dir <dir>`,
+`--build-type <type>`, `--jobs <N>`, `--no-submodules`. Run `./install_ubuntu20.sh --help`
+for the full list. The script is safe to re-run.
+
+### Prerequisites (manual setup)
+
+If you'd rather install things yourself instead of using the script above:
 
 ```bash
 sudo apt update
@@ -249,3 +268,10 @@ cmake --build build-macos
 - `cdx_lib` is the only bundled dependency that is *not* built by an `ExternalProject`
   step; it's added directly via `add_subdirectory` from `deps/cdx_lib`.
 - OpenMP support is enabled automatically when available.
+- The root `CMakeLists.txt` is intentionally thin: compiler checks, macOS/Homebrew
+  handling, third-party dependency resolution, and the GoogleTest fetch each live in
+  their own file under `cmake/`, included from the root file in dependency order.
+- `cmake/FetchGoogleTest.cmake` only fetches GoogleTest if a `gtest` target doesn't
+  already exist: libbdsg's vendored copy of sdsl-lite unconditionally builds its own
+  bundled googletest snapshot, so on most configurations that vendored copy is reused
+  instead of building a second one.
